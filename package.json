@@ -9,7 +9,8 @@
     "test:windows": "SESSION_HUB_WINDOWS_SUITE=1 bun test test/windows",
     "lint": "biome ci .",
     "typecheck": "tsc --noEmit",
-    "build": "bun scripts/build.ts"
+    "build": "bun scripts/build.ts",
+    "relay-eval": "bun scripts/relay-eval.ts"
   },
   "dependencies": {
     "ink": "8.0.0",
