@@ -301,4 +301,31 @@ describe("masking at ingest", () => {
     expect(m?.fromName).toBe("[masked:github]");
     expect(m?.text).toBe("card [masked:card]");
   });
+
+  test("an owner message queued while busy is stored once as an owner message, masked", async () => {
+    writeFileSync(
+      path,
+      `${JSON.stringify({
+        type: "attachment",
+        isSidechain: false,
+        uuid: "q-1",
+        timestamp: "2026-11-13T08:00:00.000Z",
+        attachment: {
+          type: "queued_command",
+          prompt: "Q1 yes, card 4111111111111111",
+          commandMode: "prompt",
+          origin: { kind: "human" },
+          humanTurn: true,
+        },
+      })}
+`,
+    );
+    await ingestFile(ctx(), SID, path, noErr);
+    await ingestFile(ctx(), SID, path, noErr);
+    const rows = store.history(SID, 10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.role).toBe("owner");
+    expect(rows[0]?.fromName).toBeNull();
+    expect(rows[0]?.text).toBe("Q1 yes, card [masked:card]");
+  });
 });

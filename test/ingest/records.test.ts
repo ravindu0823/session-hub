@@ -184,6 +184,58 @@ describe("classify", () => {
     expect(r[12]).toEqual({ kind: "unknown", type: "assistant", version: "2.9.0" });
   });
 
+  test("an owner message typed while the session is busy is an owner prompt", () => {
+    const rec = (origin: unknown, prompt: unknown) =>
+      classify(
+        JSON.stringify({
+          type: "attachment",
+          uuid: "u-q",
+          timestamp: "2026-11-14T09:46:16.003Z",
+          attachment: {
+            type: "queued_command",
+            prompt,
+            commandMode: "prompt",
+            origin,
+            humanTurn: true,
+          },
+        }),
+      );
+    expect(rec({ kind: "human" }, "AB8 done, check it")).toEqual({
+      kind: "owner-prompt",
+      uuid: "u-q",
+      ts: "2026-11-14T09:46:16.003Z",
+      text: "AB8 done, check it",
+    });
+    expect(rec({ kind: "human" }, [{ type: "text", text: "Q1: yes" }, { type: "image" }])).toEqual({
+      kind: "owner-prompt",
+      uuid: "u-q",
+      ts: "2026-11-14T09:46:16.003Z",
+      text: "Q1: yes",
+    });
+    // empty or missing text, and any other origin (task notifications, hooks), stay ignored
+    expect(rec({ kind: "human" }, "")).toEqual({ kind: "ignored", reason: "empty" });
+    expect(rec({ kind: "human" }, undefined)).toEqual({ kind: "ignored", reason: "empty" });
+    expect(rec({ kind: "task-notification" }, "Q1: yes")).toEqual({
+      kind: "ignored",
+      reason: "attachment",
+    });
+    // a human origin counts only on a human turn
+    for (const humanTurn of [false, undefined]) {
+      const line = JSON.stringify({
+        type: "attachment",
+        uuid: "u-q",
+        timestamp: "2026-11-14T09:46:16.003Z",
+        attachment: {
+          type: "queued_command",
+          prompt: "Q1: yes",
+          origin: { kind: "human" },
+          humanTurn,
+        },
+      });
+      expect(classify(line)).toEqual({ kind: "ignored", reason: "attachment" });
+    }
+  });
+
   test("non-string type is an unrecognised type with empty type", () => {
     expect(all("odd.jsonl")[6]).toEqual({ kind: "ignored", reason: "unrecognized-type", type: "" });
   });

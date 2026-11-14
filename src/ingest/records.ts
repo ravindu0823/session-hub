@@ -169,6 +169,14 @@ function fromRecord(r: Obj, type: string): Classified {
       const o = a.origin;
       if (o === undefined) return ignored("attachment");
       if (!isObj(o)) return unknown(r, type);
+      // An owner message typed while the session was busy is queued with a human origin: the same
+      // owner prompt as a typed turn, so History and answered-item checks see it.
+      if (o.kind === "human" && a.humanTurn === true) {
+        const text = a.prompt === undefined ? "" : userText(a.prompt);
+        if (text === null) return ignored("tool-result");
+        if (text === "") return ignored("empty");
+        return { kind: "owner-prompt", uuid, ts, text };
+      }
       if (o.kind !== "peer") return ignored("attachment");
       return {
         kind: "peer-message",
