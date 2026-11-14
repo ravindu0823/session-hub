@@ -190,8 +190,15 @@ running. Start the tray again from `%LOCALAPPDATA%\SessionHub\bin\SessionHubTray
   <img src="docs/images/window-answers.png" alt="The Send tab: an answer box under each waiting question, a free message box and a preview of what the session will receive" width="560">
 </p>
 
-Each question a session is waiting on gets its own answer box, plus one box for a free message. The preview shows
-exactly what the session will receive. In the terminal app: type the text, `Ctrl+S` shows the preview (recipient
+Each question a session is waiting on gets its own answer box with its own Send button, plus one box for a free
+message and a button that sends every filled answer at once. The preview shows exactly what the session will receive.
+
+A question counts as answered once you name its ID after the list was posted, either in the session's own terminal
+(for example `Q4: yes`, `Q2-Q5 approved` or `Q6 yes / Q7 no`, also while the session is busy) or through the hub. It stays visible,
+dimmed and tagged "answered", and drops out of the waiting counts until the session posts a new list. For a question
+answered somewhere the hub cannot see, such as another session, the tray's Dismiss link does the same (dismissals
+live in the tray only; the terminal app's counts do not include them). A question that ends with "?" or only mentions
+the ID mid-sentence does not count as an answer. In the terminal app: type the text, `Ctrl+S` shows the preview (recipient
 name, profile, cwd and the full message), `y` sends, `n` cancels. If an earlier send to that session is still open,
 the pane shows its state and `o` is needed to override.
 
@@ -225,15 +232,19 @@ the pane shows its state and `o` is needed to override.
 
 Sending runs one fixed relay command, with the message on stdin and cwd `%LOCALAPPDATA%\SessionHub\relay`:
 
-    claude -p -n session-hub-relay --permission-mode <recipient mode> --strict-mcp-config --tools "SendMessage" --allowedTools "SendMessage" --disallowedTools "<every other built-in tool>" --max-turns 2 --model haiku --no-session-persistence --output-format json
+    claude -p -n session-hub-relay --permission-mode <recipient mode> --strict-mcp-config --safe-mode --max-budget-usd 0.25 --tools "SendMessage" --allowedTools "SendMessage" --disallowedTools "<every other built-in tool>" --max-turns 2 --model haiku --no-session-persistence --output-format json
 
 The relay runs in the recipient's current permission mode (from its latest permission-mode record), which can be
 `bypassPermissions`. Its tools are limited to `SendMessage`, every other built-in tool is denied, and it stops after
-two turns. Its prompt treats the stdin text as data to deliver, never as instructions. It gets an allow-listed
+two turns, with a spend cap of USD 0.25 per run. Safe mode keeps the profile's CLAUDE.md, skills, plugins, hooks and MCP
+servers away from the relay model; only the login is used. Its prompt treats the stdin text as data to deliver, never as
+instructions. It gets an allow-listed
 environment (system paths, the user profile folders, temp and proxy settings, and `CLAUDE_CONFIG_DIR`), so no
 `ANTHROPIC_*` or `CLAUDE_CODE_*` variable can change where the text goes. It never uses `--restricted` and never changes
 `crossSessionInbound`. A relay message that matches no send to the session it landed in is counted
-(`relay_stray_count`) and logged.
+(`relay_stray_count`), logged, and shown as a warning in the TUI and the tray. `bun run relay-eval` checks the relay
+against the real model before a release: it relays plain, multi-line and injection texts to a throwaway background
+session and passes only when each arrives exactly once and nothing reaches a second session.
 
 The tray's only other signals are two named events that carry no data and only the current user can open:
 `Local\SessionHub.Tray.Quit` (set by `hub install` and `hub uninstall`) and `Local\SessionHub.Tray.Show` (a second

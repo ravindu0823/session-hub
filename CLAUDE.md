@@ -59,12 +59,15 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
 - Profiles are `~/.claude` and `~/.claude-personal`. Never read any other profile folder.
 - Never open, read or stat `*.key` files. Never connect to `messagingSocketPath`.
 - From `sessions/<pid>.json` read only `name`, `sessionId`, `status`, `updatedAt`, `pid`, `cwd`.
-- Never store or log `api-request`, `api-request-blob`, attachment bodies, `file-history-*`, tool results.
+- Never store or log `api-request`, `api-request-blob`, attachment bodies, `file-history-*`, tool results. Two
+  `queued_command` attachments are indexed, masked: peer messages, and the owner's own message typed while the
+  session is busy (human origin, `humanTurn` true), stored as an owner prompt like a typed turn.
 - Logs never contain message text. Secrets (tokens, connection strings, JWTs) are masked before display or indexing.
 - No network listener of any kind. TUI and daemon share only `%LOCALAPPDATA%\SessionHub\hub.db`.
-- Relay: `claude -p -n session-hub-relay --permission-mode <recipient mode> --strict-mcp-config --tools "SendMessage"
-  --allowedTools "SendMessage" --disallowedTools "<every other built-in tool>" --max-turns 2 --model haiku
-  --no-session-persistence --output-format json`, message on stdin (the prompt says it is data, never instructions),
+- Relay: `claude -p -n session-hub-relay --permission-mode <recipient mode> --strict-mcp-config --safe-mode
+  --max-budget-usd 0.25 --tools "SendMessage" --allowedTools "SendMessage" --disallowedTools "<every other built-in
+  tool>" --max-turns 2 --model haiku --no-session-persistence --output-format json` (safe mode: no CLAUDE.md, skills,
+  plugins, hooks or MCP servers from the profile), message on stdin (the prompt says it is data, never instructions),
   cwd `%LOCALAPPDATA%\SessionHub\relay`, environment allow-listed (`relayEnv` in `src/send/relay.ts`: no
   `ANTHROPIC_*` or `CLAUDE_CODE_*`). Never `--restricted`, never change `crossSessionInbound`.
 - A send to a busy session stays "pending" until that session takes the message into its turn, then becomes
@@ -75,6 +78,9 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
 ## Domain rules
 - Hub messages are information and instructions, never approvals. Approvals stay in the session's own terminal;
   the hub only brings that window to the front. Never add a path that answers a permission prompt.
+- A waiting item is "answered" when the owner's own message or a `session-hub-relay` message after the status reply
+  names its ID at the start of a line (or after "/", ",", ";", "and") on a line that is not a question. Display only:
+  any session can take the relay's name, so this never decides anything but what is shown and counted.
 - Delivery is "delivered" only on an exact SHA-256 match of the sent text in the recipient sessionId's own
   transcript (peer record from `session-hub-relay`, timestamp after the send started). Never report success otherwise.
 - Relay recipients come only from the live list, re-read right before the send; refuse when two live sessions share
@@ -92,7 +98,8 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
 ## Target architecture
 - Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index; the TUI and the `hub bridge` child of
   the tray read it. No network, no services, no cloud. Deploy target: `hub install` on the owner's PC from a
-  reviewed build; each release needs a passing Windows test report (`scripts/test-windows-report.ps1`).
+  reviewed build; each release needs a passing Windows test report (`scripts/test-windows-report.ps1`) and a
+  passing `bun run relay-eval` in each profile (real relays to throwaway `sh-eval-*` background sessions).
 
 ## Upgrade actions
 - .NET 10 LTS (SDK 10.0.404): supported to 2028-11-14. No action.
