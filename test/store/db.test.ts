@@ -370,6 +370,26 @@ describe("retention leaves no residue (PII-03)", () => {
   });
 });
 
+describe("purge leaves no WAL residue (PII-03)", () => {
+  const iso = (ms: number) => new Date(ms).toISOString();
+  test("purged text is gone from the database and WAL files right after the purge", () => {
+    const s = open();
+    const now = 10 * RETENTION_MS;
+    s.upsertSession(session({ sessionId: "live", transcriptPath: "live.jsonl" }));
+    const canary = "wombatcanary4417";
+    s.addMessages("live", [msg("c-1", iso(now - RETENTION_MS - 5), `${canary} ${canary}`, "live")]);
+    s.addMessages("live", [msg("k-1", iso(now - 1000), "keep this", "live")]);
+    expect(s.search(canary, 10)).toHaveLength(1);
+    s.purge(now);
+    const bytes = [dbPath, `${dbPath}-wal`]
+      .filter((p) => existsSync(p))
+      .map((p) => readFileSync(p).toString("latin1"))
+      .join("");
+    expect(bytes.includes(canary)).toBe(false);
+    expect(s.search("keep", 10)).toHaveLength(1);
+  });
+});
+
 describe("purge", () => {
   test("removes old ended sessions with messages/status/tails/fts, keeps live and recent", () => {
     const s = open();

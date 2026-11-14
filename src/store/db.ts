@@ -433,6 +433,10 @@ export class Store {
         this.db.query("DELETE FROM sends WHERE created_at < ?").run(cutoff);
       })
       .immediate();
+    // The deletes zero the freed pages (secure_delete), but older WAL frames still hold the text
+    // until a checkpoint: move them into the database and truncate the WAL now, not at the daily
+    // vacuum (PII-03). Best effort: with a reader open it checkpoints what it can and does not throw.
+    this.db.run("PRAGMA wal_checkpoint(TRUNCATE)");
     return deleted;
   }
 
