@@ -83,6 +83,8 @@ function seed(store: Store): void {
   store.setMeta("unknown_count", "2");
   store.setMeta("unknown_version", "2.9.0");
   store.setMeta("stale_since:claude-personal", String(T0 - 120_000));
+  store.setMeta("relay_stray_count", "1");
+  store.setMeta("relay_stray_last", String(T0 - 60_000));
   store.addMessages("s-alpha", [
     {
       uuid: "m1",

@@ -4,7 +4,12 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DELIVERY_WINDOW_MS, MESSAGE_HEADER, RELAY_NAME } from "../../src/config.ts";
+import {
+  DELIVERY_WINDOW_MS,
+  EVAL_SESSION_PREFIX,
+  MESSAGE_HEADER,
+  RELAY_NAME,
+} from "../../src/config.ts";
 import { type Classified, classify } from "../../src/ingest/records.ts";
 import {
   buildMessage,
@@ -248,6 +253,33 @@ describe("deliveryChecker / expireSends", () => {
       { sessionId: "s1", ts: iso(T0 + 5100) },
     ]);
     expect(store.getMeta("relay_stray_count")).toBe("2");
+    expect(store.getMeta("relay_stray_last")).toBe(String(T0 + 6000));
+  });
+
+  test("relay messages in a relay-eval fixture session are never counted as stray", () => {
+    store.upsertSession({
+      sessionId: "s-eval",
+      profile: "claude",
+      name: `${EVAL_SESSION_PREFIX}target-x1`,
+      cwd: "C:/x",
+      pid: 1,
+      kind: "background",
+      status: "idle",
+      startedAt: T0,
+      updatedAt: T0,
+      endedAt: null,
+      transcriptPath: "C:/x/s-eval.jsonl",
+      permissionMode: null,
+    });
+    const strays: unknown[] = [];
+    deliveryChecker(
+      store,
+      () => T0 + 6000,
+      (s) => strays.push(s),
+    )("s-eval", [peer(buildMessage("eval case"), T0 + 5000)]);
+    expect(strays).toEqual([]);
+    expect(store.getMeta("relay_stray_count")).toBeNull();
+    expect(store.getMeta("relay_stray_last")).toBeNull();
   });
 
   test("a relay record older than retention (a re-read transcript) is never flagged", () => {

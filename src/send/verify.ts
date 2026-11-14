@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { DELIVERY_WINDOW_MS, MESSAGE_HEADER, RELAY_NAME, RETENTION_MS } from "../config.ts";
+import {
+  DELIVERY_WINDOW_MS,
+  EVAL_SESSION_PREFIX,
+  MESSAGE_HEADER,
+  RELAY_NAME,
+  RETENTION_MS,
+} from "../config.ts";
 import type { Classified } from "../ingest/records.ts";
 import type { SendRow, SendState, Store } from "../store/db.ts";
 
@@ -105,7 +111,9 @@ export interface StrayRelay {
 /**
  * Flags every relay message in these records whose text matches no send made to this session
  * within retention, in any state (LLM-01): the relay model wrote to a session or a text the owner
- * did not send. Counted in meta relay_stray_count; the text is never stored or logged.
+ * did not send. Counted in meta relay_stray_count, with the time of the last one in relay_stray_last;
+ * the text is never stored or logged. The relay eval's own fixture sessions (EVAL_SESSION_PREFIX)
+ * receive relays the hub did not send, by design, and are skipped.
  */
 function reportStrays(
   store: Store,
@@ -116,6 +124,7 @@ function reportStrays(
 ): void {
   const relay = records.filter((r) => r.kind === "peer-message" && r.fromName === RELAY_NAME);
   if (relay.length === 0) return;
+  if (store.getSession(sessionId)?.name.startsWith(EVAL_SESSION_PREFIX)) return;
   const known = store.sendHashesSince(sessionId, now - RETENTION_MS);
   for (const r of relay) {
     if (r.kind !== "peer-message") continue;
@@ -126,6 +135,7 @@ function reportStrays(
     if (!Number.isFinite(t) || t < now - RETENTION_MS) continue;
     const n = Number(store.getMeta("relay_stray_count") ?? "0");
     store.setMeta("relay_stray_count", String((Number.isFinite(n) ? n : 0) + 1));
+    store.setMeta("relay_stray_last", String(now));
     onStray?.({ sessionId, ts: r.ts });
   }
 }

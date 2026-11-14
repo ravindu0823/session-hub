@@ -83,6 +83,7 @@ function emptySnapshot(daemonRunning: boolean): HubSnapshot {
       unknownVersion: null,
       stale: [],
       daemon: daemonRunning ? "running" : "stopped",
+      relayStrayCount: 0,
     },
     totals: { waitingItems: 0, needsApproval: 0, live: 0 },
   };
@@ -360,7 +361,11 @@ class Bridge {
       snapshot = emptySnapshot(daemon);
     } else {
       try {
-        snapshot = readSnapshot(store, { daemonRunning: daemon, knownProfiles: KNOWN_PROFILES });
+        snapshot = readSnapshot(store, {
+          daemonRunning: daemon,
+          knownProfiles: KNOWN_PROFILES,
+          now,
+        });
         this.lastStoreError = null;
       } catch (e) {
         this.storeError(e);

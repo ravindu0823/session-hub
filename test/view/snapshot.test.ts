@@ -84,4 +84,19 @@ describe("readSnapshot", () => {
     expect(meta.unknownVersion).toBe("9.9");
     expect(meta.stale).toEqual([{ profile: "claude", since: 1234 }]);
   });
+
+  test("meta carries the stray relay count for 24 h after the last stray, else 0", () => {
+    const now = 1_000_000_000_000;
+    const at = (t: number) => readSnapshot(store, { ...OPTS, now: t }).meta.relayStrayCount;
+    expect(at(now)).toBe(0);
+    store.setMeta("relay_stray_count", "2");
+    // counted by an older build that kept no time: not shown
+    expect(at(now)).toBe(0);
+    store.setMeta("relay_stray_last", String(now - 1000));
+    expect(at(now)).toBe(2);
+    expect(at(now - 1000 + 24 * 3600_000)).toBe(2);
+    expect(at(now - 1000 + 24 * 3600_000 + 1)).toBe(0);
+    store.setMeta("relay_stray_count", "x");
+    expect(at(now)).toBe(0);
+  });
 });

@@ -15,6 +15,10 @@ export const DELIVERY_WINDOW_MS = 30 * 60_000;
 /** The daemon expires overdue sends this often. */
 export const EXPIRE_EVERY_MS = 30_000;
 export const RELAY_NAME = "session-hub-relay";
+/** Name prefix of the throwaway sessions scripts/relay-eval.ts starts: relays to them are expected. */
+export const EVAL_SESSION_PREFIX = "sh-eval-";
+/** How long after the last stray relay message the TUI and the tray keep warning about it. */
+export const STRAY_WARN_MS = 24 * 3600_000;
 /** Per-relay trace (outcome, timing, cost, tokens, model; never text), in the run folder. */
 export const RELAY_LOG = "relay.log";
 /**
