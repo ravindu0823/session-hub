@@ -814,7 +814,7 @@ async function dispatch(argv: string[], d: CliDeps): Promise<number> {
       noArgs();
       return cmdBridge(d);
     case "uninstall": {
-      // The data goes by default (SH42): nothing expires it once the daemon is gone. `--purge` is the
+      // The data goes by default: nothing expires it once the daemon is gone. `--purge` is the
       // old spelling of the default and still accepted.
       const flag = rest[0];
       if (rest.length > 1 || (flag !== undefined && flag !== "--keep-data" && flag !== "--purge")) {

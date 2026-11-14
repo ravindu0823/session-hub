@@ -651,7 +651,7 @@ describe("uninstall", () => {
     expect(out.join("\n")).toContain(`data: kept ${p.dataDir}`);
   });
 
-  test("by default also deletes the data dir (SH42)", async () => {
+  test("by default also deletes the data dir", async () => {
     await installed();
     const p = paths();
     writeFileSync(p.dbPath, "db");
