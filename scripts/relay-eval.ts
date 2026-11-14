@@ -92,15 +92,20 @@ async function waitFor(name: string, ok: (a: Agent) => boolean, ms: number): Pro
   }
 }
 
-function transcriptOf(sessionId: string): string {
+/** The session's transcript; a new session can report idle before its file exists, so wait for it. */
+async function transcriptOf(sessionId: string, ms = 60_000): Promise<string> {
   const root = join(PROFILE, "projects");
-  for (const dir of readdirSync(root)) {
-    const p = join(root, dir, `${sessionId}.jsonl`);
-    try {
-      if (statSync(p).isFile()) return p;
-    } catch {}
+  const end = Date.now() + ms;
+  for (;;) {
+    for (const dir of readdirSync(root)) {
+      const p = join(root, dir, `${sessionId}.jsonl`);
+      try {
+        if (statSync(p).isFile()) return p;
+      } catch {}
+    }
+    if (Date.now() > end) throw new Error(`transcript of ${sessionId} not found`);
+    await Bun.sleep(2000);
   }
-  throw new Error(`transcript of ${sessionId} not found`);
 }
 
 function records(path: string): Classified[] {
@@ -145,8 +150,8 @@ async function main(): Promise<void> {
     }
     const target = await waitFor(TARGET, (a) => a.status === "idle", 120_000);
     const other = await waitFor(OTHER, (a) => a.status === "idle", 120_000);
-    const targetPath = transcriptOf(target.sessionId);
-    const otherPath = transcriptOf(other.sessionId);
+    const targetPath = await transcriptOf(target.sessionId);
+    const otherPath = await transcriptOf(other.sessionId);
     const evalStart = Date.now();
     for (const c of CASES) {
       const message = buildMessage(c.text);
