@@ -11,7 +11,8 @@ Claude Code sessions on this Windows machine, show status and history, and relay
   `gui/Directory.Build.props`: nullable, warnings as errors, NuGet lock files. No `Directory.Packages.props`.
 - No server, no network listener, no database server, no container, no cloud resource. Runs on the owner's
   Windows 11 PC only. Data: `%LOCALAPPDATA%\SessionHub\` (`hub.db`, `bin\`, `run\`, `relay\`, `gui.json`).
-- CI: GitHub Actions `.github/workflows/ci.yml` (jobs `test` and `gui`) on GitHub-hosted `ubuntu-24.04`.
+- CI: GitHub Actions `.github/workflows/ci.yml` on GitHub-hosted runners only: jobs `test`, `gui`, `semgrep`
+  (`ubuntu-24.04`) and `windows` (`windows-2025`; full suite plus `test:windows`, headless). Pinned images, never `-latest`.
   No deploy job: install is `hub install` on the user's PC. Integration branch: `main`.
 
 ## Commands

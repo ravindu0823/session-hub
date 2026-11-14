@@ -60,6 +60,54 @@ jobs:
           tar -xzf "${tmp}/${tarball}" -C "${tmp}" gitleaks
           "${tmp}/gitleaks" git --redact --config .gitleaks.toml --exit-code 1
 
+  # Static analysis with Semgrep CE from the pinned image. The registry rule packs are fetched at
+  # run time for this repo's own CI and never committed (the Semgrep Rules License forbids
+  # redistribution). Fails on ERROR findings only, after the full report is written.
+  semgrep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Semgrep scan
+        env:
+          SEMGREP_IMAGE: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP:/out" -w /src "$SEMGREP_IMAGE" \
+            semgrep scan --metrics=off --disable-version-check \
+              --config p/owasp-top-ten --config p/secrets --config p/csharp --config p/typescript \
+              --exclude test/fixtures --json --output /out/semgrep.json
+          jq -r '.results[] | "\(.extra.severity) \(.check_id) \(.path):\(.start.line)"' "$RUNNER_TEMP/semgrep.json"
+          jq -e '[.results[] | select(.extra.severity == "ERROR")] | length == 0' "$RUNNER_TEMP/semgrep.json"
+
+  # The Windows-only code paths (registry, ACLs, processes, focus) and every test that is skipped on
+  # Linux. Headless: the hosted runner has no console window to focus.
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    env:
+      SESSION_HUB_HEADLESS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Test
+        run: bun test
+
+      - name: Windows-only suite
+        run: bun run test:windows
+
   gui:
     env:
       EnableWindowsTargeting: "true"

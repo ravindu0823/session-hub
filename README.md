@@ -295,9 +295,16 @@ powershell -File scripts/test-windows-report.ps1   # Windows release report
 | `src/bridge`, `src/tui`, `src/cli` | Tray data link, terminal app, commands |
 | `gui/` | Tray app: `SessionHub.Core` (no WPF), `SessionHub.Tray` (WPF), `SessionHub.Tests` |
 
-CI (`.github/workflows/ci.yml`) runs lint, typecheck, coverage tests, `bun audit` and gitleaks on the `test` job, and
-the tray app's restore, tests, build and publish on the `gui` job, both on GitHub-hosted `ubuntu-24.04`. CodeQL scans
-pushes and pull requests to `main`.
+CI (`.github/workflows/ci.yml`) runs on GitHub-hosted runners only:
+
+| Job | Runner | What it checks |
+| --- | --- | --- |
+| `test` | `ubuntu-24.04` | lint, typecheck, tests with the coverage gate, `bun audit`, gitleaks |
+| `gui` | `ubuntu-24.04` | tray app locked restore, tests, build with warnings as errors, publish as shipped |
+| `windows` | `windows-2025` | the full test suite on Windows, plus the Windows-only suite (registry, ACLs, processes) |
+| `semgrep` | `ubuntu-24.04` | Semgrep CE (OWASP Top 10, secrets, C#, TypeScript packs); fails on ERROR findings |
+
+CodeQL scans pushes and pull requests to `main`.
 
 ## License
 
