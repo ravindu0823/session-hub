@@ -219,11 +219,67 @@ describe("status", () => {
       progressPct: 40,
       phase: "build",
       remaining: ["a", "b"],
-      waiting: [{ id: "Q1", text: "ok?", isNew: true, children: ["x"] }],
+      waiting: [{ id: "Q1", text: "ok?", isNew: true, children: ["x"], answered: false }],
       recommendations: ["do it"],
       replyUuid: "r2",
       replyTs: "ts2",
     });
+  });
+
+  test("items named by the owner or the relay after the status reply are answered", () => {
+    const s = open();
+    s.upsertSession(session());
+    s.upsertSession(session({ sessionId: "s2", name: "beta", transcriptPath: "C:/x/s2.jsonl" }));
+    const st = (ids: (string | null)[]) => ({
+      progressPct: null,
+      phase: null,
+      remaining: [],
+      waiting: ids.map((id, i) => ({ id, text: `q${i}`, isNew: false, children: [] })),
+      recommendations: [],
+    });
+    s.setStatus("s1", st(["Q1", "Q2", "Q3", null]), "r1", "2026-11-14T10:00:00.000Z");
+    s.setStatus("s2", st(["Q1"]), "r9", "2026-11-14T10:00:00.000Z");
+    const row = (
+      uuid: string,
+      ts: string,
+      role: MessageRow["role"],
+      text: string,
+      fromName: string | null = null,
+      sessionId = "s1",
+    ): MessageRow => ({ uuid, sessionId, ts, role, fromName, text });
+    s.addMessages("s1", [
+      // before the status reply: does not count
+      row("m0", "2026-11-14T09:59:00.000Z", "owner", "Q3 yes"),
+      // the owner's terminal answer and a relay answer after it
+      row("m1", "2026-11-14T10:01:00.000Z", "owner", "Q1 Ignore that"),
+      row("m2", "2026-11-14T10:02:00.000Z", "peer", "Answers:\nQ2: go", "session-hub-relay"),
+      // another peer naming Q3 and the assistant naming Q3 do not answer it
+      row("m3", "2026-11-14T10:03:00.000Z", "peer", "Q3: done", "some-session"),
+      row("m4", "2026-11-14T10:04:00.000Z", "assistant", "Q3 still open"),
+    ]);
+    const v = s.listSessions().find((x) => x.sessionId === "s1");
+    expect(v?.status?.waiting.map((w) => [w.id, w.answered])).toEqual([
+      ["Q1", true],
+      ["Q2", true],
+      ["Q3", false],
+      [null, false],
+    ]);
+    expect(v?.waitingCount).toBe(2);
+    // another session's messages never answer this one's items
+    expect(s.listSessions().find((x) => x.sessionId === "s2")?.status?.waiting[0]?.answered).toBe(
+      false,
+    );
+    // an ended session is never counted, so its items are not marked
+    s.upsertSession(session({ endedAt: 9000 }));
+    expect(s.listSessions().find((x) => x.sessionId === "s1")?.status?.waiting[0]?.answered).toBe(
+      false,
+    );
+    s.upsertSession(session());
+    // a new status reply starts over
+    s.setStatus("s1", st(["Q1"]), "r3", "2026-11-14T10:05:00.000Z");
+    const w = s.listSessions().find((x) => x.sessionId === "s1");
+    expect(w?.status?.waiting[0]?.answered).toBe(false);
+    expect(w?.waitingCount).toBe(1);
   });
 });
 

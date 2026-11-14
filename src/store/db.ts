@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
-import { RETENTION_MS } from "../config";
+import { RELAY_NAME, RETENTION_MS } from "../config";
 import type { TailState } from "../ingest/tail";
+import { answeredIds } from "../status/answered";
 import type { Status, WaitingItem } from "../status/extract";
 import { MIGRATIONS } from "./schema";
 
@@ -41,7 +42,16 @@ export interface SendRow {
   detail: string | null;
 }
 
-export interface StoredStatus extends Status {
+/**
+ * A waiting item as shown: `answered` when the owner named its ID in the session's terminal, or a
+ * Session Hub relay message did, after the status reply (src/status/answered.ts).
+ */
+export interface ViewWaitingItem extends WaitingItem {
+  answered: boolean;
+}
+
+export interface StoredStatus extends Omit<Status, "waiting"> {
+  waiting: ViewWaitingItem[];
   replyUuid: string;
   replyTs: string;
 }
@@ -234,8 +244,17 @@ export class Store {
           ORDER BY (s.ended_at IS NOT NULL), s.profile, s.name, s.session_id`,
       )
       .all() as Row[];
+    const answers = this.answersSinceStatus();
     return rows.map((r) => {
-      const waiting = r.waiting_json ? (JSON.parse(r.waiting_json as string) as WaitingItem[]) : [];
+      const listed = r.waiting_json ? (JSON.parse(r.waiting_json as string) as WaitingItem[]) : [];
+      const answered = answeredIds(
+        listed.flatMap((w) => (w.id === null ? [] : [w.id])),
+        answers.get(r.session_id as string) ?? [],
+      );
+      const waiting: ViewWaitingItem[] = listed.map((w) => ({
+        ...w,
+        answered: w.id !== null && answered.has(w.id),
+      }));
       const status: StoredStatus | null =
         r.st_reply_uuid == null
           ? null
@@ -257,8 +276,39 @@ export class Store {
               hasStatus: r.has_status === 1,
             };
       const { status: state, ...rest } = toSession(r);
-      return { ...rest, state, status, latestReply, waitingCount: waiting.length };
+      return {
+        ...rest,
+        state,
+        status,
+        latestReply,
+        waitingCount: waiting.filter((w) => !w.answered).length,
+      };
     });
+  }
+
+  /**
+   * Per live session with waiting items, the texts of the owner's own messages and of relay messages
+   * newer than its status reply, oldest first: what can answer that reply's waiting items. Ended
+   * sessions are not counted anywhere, so their items are never marked.
+   */
+  private answersSinceStatus(): Map<string, string[]> {
+    const rows = this.db
+      .query(
+        `SELECT m.session_id, m.text FROM status st
+           JOIN sessions s ON s.session_id = st.session_id AND s.ended_at IS NULL
+           JOIN messages m ON m.session_id = st.session_id AND m.ts > st.reply_ts
+          WHERE st.waiting_json <> '[]'
+            AND (m.role = 'owner' OR (m.role = 'peer' AND m.from_name = ?))
+          ORDER BY m.session_id, m.ts`,
+      )
+      .all(RELAY_NAME) as { session_id: string; text: string }[];
+    const out = new Map<string, string[]>();
+    for (const r of rows) {
+      const list = out.get(r.session_id);
+      if (list) list.push(r.text);
+      else out.set(r.session_id, [r.text]);
+    }
+    return out;
   }
 
   // ---- tails ----

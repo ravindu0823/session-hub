@@ -10,6 +10,8 @@ export interface HubMeta {
   unknownVersion: string | null;
   /** Profiles whose live list could not be refreshed, with the time it went stale (epoch ms). */
   stale: { profile: string; since: number }[];
+  /** Relay messages that landed in a session other than the one they were sent to (verify.ts). */
+  relayStrayCount: number;
 }
 
 export interface Line {
@@ -33,6 +35,12 @@ export function statusLines(s: SessionView, meta: HubMeta, now: number, width: n
   if (meta.unknownCount > 0) {
     const v = meta.unknownVersion ? ` (version ${meta.unknownVersion})` : "";
     add(`format changed: ${meta.unknownCount} unknown records skipped${v}`, { color: "red" });
+  }
+  if (meta.relayStrayCount > 0) {
+    const n = meta.relayStrayCount;
+    add(`relay: ${n} message${n === 1 ? "" : "s"} reached the wrong session (see run\\relay.log)`, {
+      color: "red",
+    });
   }
   const st = s.status;
   const lr = s.latestReply;
@@ -65,6 +73,12 @@ export function statusLines(s: SessionView, meta: HubMeta, now: number, width: n
   if (st.waiting.length === 0) add("  nothing", { dim: true });
   for (const w of st.waiting) {
     const id = w.id ? `${w.id} ` : "";
+    // An item the owner already answered after this list was posted stays visible, dimmed.
+    if (w.answered) {
+      add(`  ${id}(answered) ${w.text}`, { dim: true }, "    ");
+      for (const c of w.children) add(`    - ${c}`, { dim: true }, "      ");
+      continue;
+    }
     const isNew = w.isNew ? "NEW " : "";
     add(`  ${id}${isNew}${w.text}`, w.isNew ? { color: "yellow" } : {}, "    ");
     for (const c of w.children) add(`    - ${c}`, { dim: true }, "      ");
