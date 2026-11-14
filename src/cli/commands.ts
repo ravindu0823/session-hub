@@ -84,7 +84,8 @@ export const USAGE = [
   "  hub install [--allow-unreviewed]",
   "                          install dist\\*.exe (hub, daemon, tray) and start both at login;",
   "                          refuses a build from uncommitted changes without --allow-unreviewed",
-  "  hub uninstall [--purge] remove the install; --purge also deletes the data",
+  "  hub uninstall [--keep-data]",
+  "                          remove the install and the data; --keep-data keeps the data",
   "  hub bridge              (internal) data link for the tray app over stdin/stdout",
   "  hub --version           print the version",
   "  hub --help              print this help",
@@ -776,7 +777,7 @@ async function cmdUninstall(purge: boolean, d: CliDeps): Promise<number> {
       d.out(`removing ${target} after this command exits`);
     }
   }
-  if (!purge) d.out(`data: kept ${p.dataDir} (run "hub uninstall --purge" to delete it)`);
+  if (!purge) d.out(`data: kept ${p.dataDir} (run "hub uninstall" again to delete it)`);
   return code;
 }
 
@@ -813,8 +814,13 @@ async function dispatch(argv: string[], d: CliDeps): Promise<number> {
       noArgs();
       return cmdBridge(d);
     case "uninstall": {
-      if (rest.length > 1 || (rest.length === 1 && rest[0] !== "--purge")) throw new UsageError();
-      return cmdUninstall(rest[0] === "--purge", d);
+      // The data goes by default (SH42): nothing expires it once the daemon is gone. `--purge` is the
+      // old spelling of the default and still accepted.
+      const flag = rest[0];
+      if (rest.length > 1 || (flag !== undefined && flag !== "--keep-data" && flag !== "--purge")) {
+        throw new UsageError();
+      }
+      return cmdUninstall(flag !== "--keep-data", d);
     }
     default:
       throw new UsageError();

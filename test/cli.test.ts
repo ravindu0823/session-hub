@@ -196,6 +196,7 @@ describe("parsing, usage and exit codes", () => {
     [["daemon", "status", "extra"]],
     [["install", "--force"]],
     [["uninstall", "--purge", "--purge"]],
+    [["uninstall", "--keep-data", "--purge"]],
     [["uninstall", "--all"]],
     [["--version", "x"]],
     [["bridge", "x"]],
@@ -633,11 +634,11 @@ describe("uninstall", () => {
     platform.calls.length = 0;
   }
 
-  test("clears autostart, stops the daemon, removes shim and bin, keeps data", async () => {
+  test("--keep-data: clears autostart, stops the daemon, removes shim and bin, keeps data", async () => {
     await installed();
     const p = paths();
     writeFileSync(p.dbPath, "db");
-    expect(await runCli(["uninstall"], makeDeps())).toBe(0);
+    expect(await runCli(["uninstall", "--keep-data"], makeDeps())).toBe(0);
     expect(changes()).toEqual([
       { method: "signalTrayQuit", args: [] },
       { method: "clearAutostart", args: ["SessionHubDaemon"] },
@@ -647,12 +648,22 @@ describe("uninstall", () => {
     expect(existsSync(p.shimPath)).toBe(false);
     expect(existsSync(p.binDir)).toBe(false);
     expect(existsSync(p.dbPath)).toBe(true);
-    expect(out.join("\n")).toContain("--purge");
+    expect(out.join("\n")).toContain(`data: kept ${p.dataDir}`);
+  });
+
+  test("by default also deletes the data dir (SH42)", async () => {
+    await installed();
+    const p = paths();
+    writeFileSync(p.dbPath, "db");
+    expect(await runCli(["uninstall"], makeDeps())).toBe(0);
+    expect(existsSync(p.dataDir)).toBe(false);
+    expect(existsSync(p.shimPath)).toBe(false);
+    expect(out.join("\n")).not.toContain("data: kept");
   });
 
   test("uninstall marks the daemon stopped, so a tray that would not quit cannot restart it", async () => {
     await installed();
-    expect(await runCli(["uninstall"], makeDeps())).toBe(0);
+    expect(await runCli(["uninstall", "--keep-data"], makeDeps())).toBe(0);
     expect(existsSync(join(paths().runDir, DAEMON_STOPPED_FILE))).toBe(true);
   });
 
@@ -692,7 +703,7 @@ describe("uninstall", () => {
         nodeFs.remove(path);
       },
     };
-    expect(await runCli(["uninstall"], makeDeps({ fs }))).toBe(0);
+    expect(await runCli(["uninstall", "--keep-data"], makeDeps({ fs }))).toBe(0);
     expect(removedAfterExit).toEqual([[p.binDir]]);
     expect(existsSync(p.shimPath)).toBe(false);
   });

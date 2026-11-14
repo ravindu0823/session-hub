@@ -88,8 +88,8 @@ installs in one step from a clean, pushed `main`.
 To remove it:
 
 ```powershell
-hub uninstall            # quits the tray, clears autostart, stops the daemon, removes the hub command; keeps the data
-hub uninstall --purge    # also deletes the data directory
+hub uninstall               # quits the tray, clears autostart, stops the daemon, removes the hub command and the data
+hub uninstall --keep-data   # the same, but keeps the data directory
 ```
 
 <details>
@@ -260,7 +260,7 @@ Everything lives in `%LOCALAPPDATA%\SessionHub\`:
 | `run\` | Daemon and tray logs, `relay.log`, lock and pid files | Logs never contain message text |
 | `bin\` | The installed programs and `install-manifest.txt` | Until `hub uninstall` |
 
-`hub uninstall` keeps the data directory; `hub uninstall --purge` deletes it.
+`hub uninstall` deletes the data directory too; `hub uninstall --keep-data` keeps it.
 
 ## Troubleshooting
 
