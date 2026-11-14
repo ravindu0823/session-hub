@@ -55,6 +55,16 @@ describe("windows acl", () => {
     expect(await platform.isPrivateDir(d)).toBe(false);
   });
 
+  test.skipIf(!runWin)("an explicit grant to another principal is removed", async () => {
+    // An elevated admin's new folders can carry an explicit Administrators entry, which
+    // /inheritance:r does not remove; Users stands in for it here.
+    const d = join(tempDir(), "explicit");
+    mkdirSync(d);
+    expect(await icacls(d, "/grant", "*S-1-5-32-545:(OI)(CI)R")).toBe(0);
+    await platform.ensurePrivateDir(d);
+    expect(await platform.isPrivateDir(d)).toBe(true);
+  });
+
   test.skipIf(!runWin)("default inherited temp dir is not private", async () => {
     const d = tempDir();
     expect(await platform.isPrivateDir(d)).toBe(false);

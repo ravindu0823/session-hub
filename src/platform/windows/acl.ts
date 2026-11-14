@@ -79,7 +79,15 @@ export async function ensurePrivateDir(dir: string): Promise<void> {
     `*${me.sid.toUpperCase()}:(OI)(CI)F`,
     "*S-1-5-18:(OI)(CI)F",
   ]);
-  const blockers = await inspect(dir);
+  // /inheritance:r drops inherited entries and /grant:r replaces only the two grants above, so an
+  // explicit entry for anyone else survives (an elevated admin's new folders can carry one for
+  // BUILTIN\Administrators). Remove each remaining principal by the name icacls printed, then verify.
+  let blockers = await inspect(dir);
+  if (blockers !== null && blockers.length > 0) {
+    for (const principal of blockers)
+      await runChecked([sysbin.icacls(), dir, "/remove", principal]);
+    blockers = await inspect(dir);
+  }
   if (blockers === null) throw new Error("directory is not private: icacls could not verify it");
   if (blockers.length > 0) {
     throw new Error(`directory is not private; blocking principals: ${blockers.join(", ")}`);
