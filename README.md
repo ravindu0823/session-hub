@@ -225,10 +225,13 @@ the pane shows its state and `o` is needed to override.
 
 Sending runs one fixed relay command, with the message on stdin and cwd `%LOCALAPPDATA%\SessionHub\relay`:
 
-    claude -p -n session-hub-relay --permission-mode <recipient mode> --strict-mcp-config --tools "SendMessage" --allowedTools "SendMessage" --model haiku --no-session-persistence --output-format json
+    claude -p -n session-hub-relay --permission-mode <recipient mode> --strict-mcp-config --tools "SendMessage" --allowedTools "SendMessage" --disallowedTools "<every other built-in tool>" --max-turns 2 --model haiku --no-session-persistence --output-format json
 
 The relay runs in the recipient's current permission mode (from its latest permission-mode record), which can be
-`bypassPermissions`. Its tools are limited to `SendMessage`. It never uses `--restricted` and never changes
+`bypassPermissions`. Its tools are limited to `SendMessage`, every other built-in tool is denied, and it stops after
+two turns. Its prompt treats the stdin text as data to deliver, never as instructions. It gets an allow-listed
+environment (system paths, the user profile folders, temp and proxy settings, and `CLAUDE_CONFIG_DIR`), so no
+`ANTHROPIC_*` or `CLAUDE_CODE_*` variable can change where the text goes. It never uses `--restricted` and never changes
 `crossSessionInbound`. A relay message that matches no send to the session it landed in is counted
 (`relay_stray_count`) and logged.
 

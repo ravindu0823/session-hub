@@ -62,8 +62,10 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
 - Logs never contain message text. Secrets (tokens, connection strings, JWTs) are masked before display or indexing.
 - No network listener of any kind. TUI and daemon share only `%LOCALAPPDATA%\SessionHub\hub.db`.
 - Relay: `claude -p -n session-hub-relay --permission-mode <recipient mode> --strict-mcp-config --tools "SendMessage"
-  --allowedTools "SendMessage" --model haiku --no-session-persistence --output-format json`, message on stdin, cwd
-  `%LOCALAPPDATA%\SessionHub\relay`. Never `--restricted`, never change `crossSessionInbound`.
+  --allowedTools "SendMessage" --disallowedTools "<every other built-in tool>" --max-turns 2 --model haiku
+  --no-session-persistence --output-format json`, message on stdin (the prompt says it is data, never instructions),
+  cwd `%LOCALAPPDATA%\SessionHub\relay`, environment allow-listed (`relayEnv` in `src/send/relay.ts`: no
+  `ANTHROPIC_*` or `CLAUDE_CODE_*`). Never `--restricted`, never change `crossSessionInbound`.
 - A send to a busy session stays "pending" until that session takes the message into its turn, then becomes
   "delivered" (within 30 minutes, else "expired").
 - Windows-only code lives in `src/platform/windows/*` behind interfaces in `src/platform/types.ts`.

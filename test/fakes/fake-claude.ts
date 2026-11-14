@@ -46,6 +46,7 @@ if (args.includes("-p")) {
       argv: args,
       stdin,
       configDir: env.CLAUDE_CONFIG_DIR,
+      envKeys: Object.keys(env),
       cwd: process.cwd(),
     };
     appendFileSync(env.FAKE_RELAY_LOG, `${JSON.stringify(line)}\n`);
