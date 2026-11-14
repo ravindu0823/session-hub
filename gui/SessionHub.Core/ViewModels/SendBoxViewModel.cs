@@ -1,7 +1,10 @@
 namespace SessionHub.Core.ViewModels;
 
-/// <summary>The text and flags of a send request, kept when the bridge refused it.</summary>
-public sealed record SendAttempt(string Text, bool Override, bool AllowSecret);
+/// <summary>
+/// The text and flags of a send request, kept when the bridge refused it. <paramref name="ItemKey"/> is set
+/// when it was one item's own Send, so "Send anyway" repeats that same send.
+/// </summary>
+public sealed record SendAttempt(string Text, bool Override, bool AllowSecret, string? ItemKey = null);
 
 /// <summary>
 /// State line of the send box. A send that timed out is never retried here: the text says it may

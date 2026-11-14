@@ -59,6 +59,13 @@ internal sealed partial class PanelWindow : Window
             PanelCommands.SendSecretAnyway,
             (_, e) => On<CardViewModel>(e, c => _ = host.SendAsync(c, SendMode.AllowSecret)),
             (_, e) => e.CanExecute = CanSend(e.Parameter) && e.Parameter is CardViewModel { SendBox.CanSendAnyway: true }));
+        CommandBindings.Add(new CommandBinding(
+            PanelCommands.SendItem,
+            (_, e) => On<AnswerItemViewModel>(e, i =>
+            {
+                if (vm.Card(i.SessionId) is { } c) _ = host.SendItemAsync(c, i.Key);
+            }),
+            (_, e) => e.CanExecute = CanSendItem(e.Parameter)));
 
         vm.PropertyChanged += OnViewModelChanged;
         PreviewKeyDown += OnKey;
@@ -166,6 +173,10 @@ internal sealed partial class PanelWindow : Window
     /// <summary>Sends need a live link, and the card's previous request back (no double send on a double Enter).</summary>
     private bool CanSend(object? parameter) =>
         vm.CanSend && parameter is CardViewModel { IsRequesting: false } card && (!card.Answers.IsActive || card.Answers.CanSend);
+
+    /// <summary>One item's Send: its box filled and within the limit, and its card free to send (as the main button).</summary>
+    private bool CanSendItem(object? parameter) =>
+        parameter is AnswerItemViewModel { CanSend: true } item && vm.CanSend && vm.Card(item.SessionId) is { IsRequesting: false };
 
     private static void On<T>(ExecutedRoutedEventArgs e, Action<T> action)
         where T : class

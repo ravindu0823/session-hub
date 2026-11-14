@@ -23,4 +23,16 @@ public sealed class GuiSettings
     /// with no entry (a gui.json from before this field) counts as seen when the tray loads it.
     /// </summary>
     public Dictionary<string, DateTimeOffset> DraftsSeen { get; set; } = [];
+
+    /// <summary>At most this many dismissed items are kept; the oldest go first.</summary>
+    public const int MaxDismissed = 200;
+
+    /// <summary>Longest dismissed-item key kept; a longer one is dropped.</summary>
+    public const int MaxDismissedKeyChars = 1_000;
+
+    /// <summary>
+    /// Waiting items the owner dismissed in the tray, as <c>&lt;session id&gt;#&lt;draft label&gt;@&lt;status reply&gt;</c>,
+    /// oldest first. A new status reply from the session leaves its old keys behind (they are pruned).
+    /// </summary>
+    public List<string> Dismissed { get; set; } = [];
 }

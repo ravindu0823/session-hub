@@ -102,6 +102,10 @@ public partial class AnswerForm : UserControl
 
     private void OnClear(object sender, RoutedEventArgs e) => (DataContext as CardViewModel)?.Answers.Clear();
 
+    private void OnDismiss(object sender, RoutedEventArgs e) => ((sender as FrameworkElement)?.DataContext as AnswerItemViewModel)?.Dismiss();
+
+    private void OnUndo(object sender, RoutedEventArgs e) => ((sender as FrameworkElement)?.DataContext as AnswerItemViewModel)?.Undo();
+
     private static TextBox? FirstTextBox(DependencyObject root)
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)

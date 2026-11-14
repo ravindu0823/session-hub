@@ -307,7 +307,24 @@ public sealed class SettingsStore : IDisposable
             if (drafts.ContainsKey(key)) seen[key] = at;
         }
 
-        return new GuiSettings { Notifications = s.Notifications, Window = s.Window, Drafts = drafts, DraftsSeen = seen };
+        // Dismissed keys: no blanks, no repeats, none too long, and only the newest MaxDismissed.
+        var dismissed = new List<string>();
+        foreach (var key in s.Dismissed ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(key) || key.Length > GuiSettings.MaxDismissedKeyChars || dismissed.Contains(key)) continue;
+            dismissed.Add(key);
+        }
+
+        if (dismissed.Count > GuiSettings.MaxDismissed) dismissed.RemoveRange(0, dismissed.Count - GuiSettings.MaxDismissed);
+
+        return new GuiSettings
+        {
+            Notifications = s.Notifications,
+            Window = s.Window,
+            Drafts = drafts,
+            DraftsSeen = seen,
+            Dismissed = dismissed,
+        };
     }
 
     /// <summary>Cuts a draft to <see cref="GuiSettings.MaxDraftChars"/> without splitting a surrogate pair.</summary>

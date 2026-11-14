@@ -6,7 +6,11 @@ namespace SessionHub.Core.Protocol;
 // Wire models for the `hub bridge` NDJSON protocol (src/bridge/protocol.ts). Unknown fields are
 // ignored on read. Enum-like strings (state, role) stay strings so a new daemon value never fails.
 
-public sealed record WaitingItem(string? Id, string Text, bool IsNew, IReadOnlyList<string> Children);
+/// <summary>
+/// One "Waiting on you" item. <paramref name="Answered"/>: the owner's own message, or a Session Hub relay
+/// message, named its ID after the status reply was posted (false when an older daemon leaves it out).
+/// </summary>
+public sealed record WaitingItem(string? Id, string Text, bool IsNew, IReadOnlyList<string> Children, bool Answered = false);
 
 public sealed record SessionStatus(
     int? ProgressPct,
@@ -37,7 +41,16 @@ public sealed record SessionView(
 
 public sealed record StaleProfile(string Profile, long Since);
 
-public sealed record Meta(int UnknownCount, string? UnknownVersion, IReadOnlyList<StaleProfile> Stale, [property: JsonRequired] string Daemon);
+/// <summary>
+/// <paramref name="RelayStrayCount"/>: relay messages that landed in a session other than the one they were
+/// sent to (0 when an older daemon leaves it out).
+/// </summary>
+public sealed record Meta(
+    int UnknownCount,
+    string? UnknownVersion,
+    IReadOnlyList<StaleProfile> Stale,
+    [property: JsonRequired] string Daemon,
+    int RelayStrayCount = 0);
 
 public sealed record Totals([property: JsonRequired] int WaitingItems, [property: JsonRequired] int NeedsApproval, [property: JsonRequired] int Live);
 

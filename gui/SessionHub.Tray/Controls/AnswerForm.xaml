@@ -55,10 +55,12 @@
                 <DataTemplate>
                     <Border Style="{StaticResource QuestionCard}">
                         <StackPanel>
+                            <!-- Label, the tag of an answered or dismissed item, the text; Dismiss or Undo on the right. -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" MinWidth="{Binding LabelMinWidth, ElementName=Root}" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="{Binding Label}" FontWeight="Bold" Margin="0,0,10,0" TextWrapping="NoWrap">
                                     <TextBlock.Style>
@@ -68,14 +70,46 @@
                                                 <DataTrigger Binding="{Binding IsNoId}" Value="True">
                                                     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
                                                 </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSettled}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Column="1" TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSettled}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                    <InlineUIContainer BaselineAlignment="Center"><ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource StateTagTemplate}" Margin="0,0,6,0" Visibility="{Binding TagText, Converter={StaticResource EmptyToCollapsed}}" /></InlineUIContainer><Run Text="{Binding Text, Mode=OneWay}" />
+                                </TextBlock>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="10,0,0,0">
+                                    <Button Style="{StaticResource QuietLinkButton}" Content="Dismiss" Click="OnDismiss"
+                                            ToolTip="Answered somewhere Session Hub can't see? Dismiss it so it stops counting as waiting on you."
+                                            AutomationProperties.Name="{Binding Label, StringFormat='Dismiss {0}'}"
+                                            Visibility="{Binding CanDismiss, Converter={StaticResource Visible}}" />
+                                    <Button Style="{StaticResource SmallLinkButton}" Content="Undo" Click="OnUndo"
+                                            AutomationProperties.Name="{Binding Label, StringFormat='Undo dismiss of {0}'}"
+                                            Visibility="{Binding CanUndo, Converter={StaticResource Visible}}" />
+                                </StackPanel>
                             </Grid>
                             <ItemsControl ItemsSource="{Binding Children}" Margin="{Binding ChildMargin, ElementName=Root}" Focusable="False"
                                           Visibility="{Binding HasChildren, Converter={StaticResource Visible}}">
+                                <ItemsControl.Style>
+                                    <Style TargetType="ItemsControl">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSettled}" Value="True">
+                                                <Setter Property="Opacity" Value="0.7" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ItemsControl.Style>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding StringFormat='• {0}'}" TextWrapping="Wrap" FontSize="12.5"
@@ -83,7 +117,13 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <Border Style="{StaticResource FieldBorder}" Margin="0,8,0,0" MinHeight="{Binding AnswerMinHeight, ElementName=Root}">
+                            <!-- The answer box, with this item's own Send at its bottom right. -->
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource FieldBorder}" MinHeight="{Binding AnswerMinHeight, ElementName=Root}">
                                 <Grid>
                                     <TextBlock Text="{Binding Placeholder}" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis"
                                                IsHitTestVisible="False" VerticalAlignment="Top">
@@ -104,6 +144,16 @@
                                              Text="{Binding Answer, UpdateSourceTrigger=PropertyChanged}" />
                                 </Grid>
                             </Border>
+                            <Button Grid.Column="1" Style="{StaticResource TinyPrimaryButton}" Margin="8,0,0,0" VerticalAlignment="Bottom"
+                                    Command="t:PanelCommands.SendItem" CommandParameter="{Binding}"
+                                    ToolTip="Send only this answer" ToolTipService.ShowOnDisabled="False"
+                                    AutomationProperties.Name="{Binding Label, StringFormat='Send the answer to {0}'}">
+                                <StackPanel Orientation="Horizontal">
+                                    <c:Glyph Data="{StaticResource Icon.Send}" Size="13" Margin="0,0,5,0" />
+                                    <TextBlock Text="Send" />
+                                </StackPanel>
+                            </Button>
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </DataTemplate>

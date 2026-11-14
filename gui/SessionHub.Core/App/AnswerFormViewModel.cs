@@ -9,29 +9,48 @@ namespace SessionHub.Core.App;
 /// <summary>
 /// What one send took: the text, and the boxes as they were, so only those are cleared after the
 /// bridge accepts it. <paramref name="Answers"/> is empty for a plain reply (no waiting items).
+/// <paramref name="Message"/> is null when the send did not take the message box (one item's own Send).
 /// </summary>
-public sealed record SendPayload(string Text, string Message, IReadOnlyDictionary<string, string> Answers, bool FromForm);
+public sealed record SendPayload(string Text, string? Message, IReadOnlyDictionary<string, string> Answers, bool FromForm);
 
 /// <summary>One waiting item of the answer form, with its answer box.</summary>
 public sealed class AnswerItemViewModel : ObservableObject
 {
+    public const string AnsweredTag = "Answered";
+    public const string DismissedTag = "Dismissed";
+
+    public const string AnsweredToolTip =
+        "You answered this in the session's terminal or through the hub after this list was posted.";
+
+    public const string DismissedToolTip =
+        "You dismissed this item here. It no longer counts as waiting on you; Undo brings it back.";
+
     private readonly SessionViewModel session;
+    private bool isAnswered;
 
     internal AnswerItemViewModel(SessionViewModel session, WaitingItem item, string label, string key)
     {
         this.session = session;
         Label = label;
         Key = key;
-        IsNoId = string.IsNullOrWhiteSpace(item.Id);
+        Id = string.IsNullOrWhiteSpace(item.Id) ? null : item.Id;
+        IsNoId = Id is null;
         Text = item.Text;
         Children = item.Children;
+        isAnswered = item.Answered;
     }
+
+    /// <summary>The session this item waits in (the per-item Send finds its card by it).</summary>
+    public string SessionId => session.SessionId;
 
     /// <summary>The item's ID, or "Item n" (shown muted) when it has none.</summary>
     public string Label { get; }
 
     /// <summary>What the answer draft is kept under (<see cref="AnswerComposer.DraftLabels"/>).</summary>
     public string Key { get; }
+
+    /// <summary>The item's own ID; null when it has none.</summary>
+    public string? Id { get; }
 
     public bool IsNoId { get; }
 
@@ -53,11 +72,61 @@ public sealed class AnswerItemViewModel : ObservableObject
     /// <summary>The box has text: the card gets the amber edge.</summary>
     public bool IsFilled => !string.IsNullOrWhiteSpace(Answer);
 
+    /// <summary>The daemon saw an answer naming this item after the list was posted.</summary>
+    public bool IsAnswered => isAnswered;
+
+    /// <summary>The owner dismissed this item in the tray (for the current status reply).</summary>
+    public bool IsDismissed => session.IsDismissed(Key);
+
+    /// <summary>Answered or dismissed: shown dimmed with a tag, and left out of every count.</summary>
+    public bool IsSettled => isAnswered || IsDismissed;
+
+    /// <summary>"Answered", "Dismissed" or empty.</summary>
+    public string TagText => isAnswered ? AnsweredTag : IsDismissed ? DismissedTag : "";
+
+    public string TagToolTip => isAnswered ? AnsweredToolTip : IsDismissed ? DismissedToolTip : "";
+
+    /// <summary>The "Dismiss" link shows on items that are still open.</summary>
+    public bool CanDismiss => !IsSettled;
+
+    /// <summary>The "Undo" link shows on a dismissed item the daemon has not seen answered.</summary>
+    public bool CanUndo => IsDismissed && !isAnswered;
+
+    /// <summary>What this item's own Send carries: <c>Answers:</c> and its line (empty while the box is blank).</summary>
+    public string SendText => AnswerComposer.ComposeOne(Label, Answer);
+
+    /// <summary>The item's own Send: a filled box, a live session, within the relay's limit.</summary>
+    public bool CanSend => session.IsLive && IsFilled && SendText.Length <= AnswerComposer.MaxChars;
+
+    public void Dismiss() => session.SetDismissed(Key, true);
+
+    public void Undo() => session.SetDismissed(Key, false);
+
     internal void Changed()
     {
         Raise(nameof(Answer));
         Raise(nameof(IsFilled));
+        Raise(nameof(SendText));
+        Raise(nameof(CanSend));
     }
+
+    internal void SetAnswered(bool value)
+    {
+        if (!SetField(ref isAnswered, value, nameof(IsAnswered))) return;
+        SettledChanged();
+    }
+
+    internal void SettledChanged()
+    {
+        Raise(nameof(IsDismissed));
+        Raise(nameof(IsSettled));
+        Raise(nameof(TagText));
+        Raise(nameof(TagToolTip));
+        Raise(nameof(CanDismiss));
+        Raise(nameof(CanUndo));
+    }
+
+    internal void LiveChanged() => Raise(nameof(CanSend));
 }
 
 /// <summary>
@@ -71,6 +140,7 @@ public sealed class AnswerFormViewModel : ObservableObject
     private readonly SessionViewModel session;
     private IReadOnlyList<string> keys = [];
     private bool isActive;
+    private int total;
     private int answeredCount;
     private string composed = "";
     private string footerText = "";
@@ -84,6 +154,7 @@ public sealed class AnswerFormViewModel : ObservableObject
         this.session = session;
         session.PropertyChanged += OnSessionChanged;
         session.AnswerChanged += OnAnswerChanged;
+        session.DismissedChanged += OnDismissedChanged;
         Rebuild();
     }
 
@@ -96,15 +167,21 @@ public sealed class AnswerFormViewModel : ObservableObject
         private set => SetField(ref isActive, value);
     }
 
-    public int Total => Items.Count;
+    /// <summary>Items still open: answered and dismissed ones are left out.</summary>
+    public int Total
+    {
+        get => total;
+        private set => SetField(ref total, value);
+    }
 
+    /// <summary>Open items whose box is filled.</summary>
     public int AnsweredCount
     {
         get => answeredCount;
         private set => SetField(ref answeredCount, value);
     }
 
-    /// <summary>"1 of 3 answered + message · Ctrl+Enter sends".</summary>
+    /// <summary>"1 of 3 answered + message · Ctrl+Enter sends" (open items only).</summary>
     public string FooterText
     {
         get => footerText;
@@ -169,13 +246,26 @@ public sealed class AnswerFormViewModel : ObservableObject
     }
 
     /// <summary>
+    /// The text one item's own Send carries and its box as it is now; the message box is not taken. Empty
+    /// text when the item is gone or its box is blank.
+    /// </summary>
+    public SendPayload CaptureOne(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var item = Items.FirstOrDefault(i => i.Key == key);
+        if (item is null || !item.IsFilled) return new SendPayload("", null, new Dictionary<string, string>(), FromForm: false);
+        var answers = new Dictionary<string, string>(StringComparer.Ordinal) { [key] = item.Answer };
+        return new SendPayload(item.SendText, null, answers, FromForm: false);
+    }
+
+    /// <summary>
     /// After the bridge accepted <paramref name="sent"/>: clears the boxes that still hold what was
     /// sent (an edit made meanwhile stays), and drops answer drafts whose item is no longer waiting.
     /// </summary>
     public void ClearSent(SendPayload sent)
     {
         ArgumentNullException.ThrowIfNull(sent);
-        if (session.Draft == sent.Message) session.Draft = "";
+        if (sent.Message is not null && session.Draft == sent.Message) session.Draft = "";
         foreach (var (key, text) in sent.Answers)
         {
             if (session.GetAnswer(key) == text) session.SetAnswer(key, "");
@@ -200,8 +290,11 @@ public sealed class AnswerFormViewModel : ObservableObject
         switch (e.PropertyName)
         {
             case nameof(SessionViewModel.Waiting):
+                Rebuild();
+                break;
             case nameof(SessionViewModel.IsLive):
                 Rebuild();
+                foreach (var item in Items) item.LiveChanged();
                 break;
             case nameof(SessionViewModel.Draft):
                 Recompute();
@@ -216,6 +309,12 @@ public sealed class AnswerFormViewModel : ObservableObject
             if (item.Key == key) item.Changed();
         }
 
+        Recompute();
+    }
+
+    private void OnDismissedChanged()
+    {
+        foreach (var item in Items) item.SettledChanged();
         Recompute();
     }
 
@@ -241,6 +340,10 @@ public sealed class AnswerFormViewModel : ObservableObject
                 continue;
             }
 
+            kept.SetAnswered(item.Answered);
+            // Dismissals are per status reply: a kept item may have lost its dismissal to a new reply.
+            kept.SettledChanged();
+
             // A kept item is never before i (positions before i are final), so it moves up or stays.
             var at = Items.IndexOf(kept);
             if (at != i) Items.Move(at, i);
@@ -248,17 +351,21 @@ public sealed class AnswerFormViewModel : ObservableObject
 
         // Positions 0..n-1 now hold the new list; what was pushed past them is gone.
         while (Items.Count > waiting.Count) Items.RemoveAt(Items.Count - 1);
-        Raise(nameof(Total));
         IsActive = session.IsLive && waiting.Count > 0;
         Recompute();
     }
 
     private void Recompute()
     {
-        AnsweredCount = Items.Count(i => i.IsFilled);
+        Total = Items.Count(i => !i.IsSettled);
+        AnsweredCount = Items.Count(i => i.IsFilled && !i.IsSettled);
         var hasMessage = !string.IsNullOrWhiteSpace(session.Draft);
-        FooterText = $"{AnsweredCount.ToString(CultureInfo.InvariantCulture)} of {Total.ToString(CultureInfo.InvariantCulture)} answered{(hasMessage ? " + message" : "")} · Ctrl+Enter sends";
-        SendLabel = AnsweredCount > 0 ? "Send answers" : "Send message";
+        var counted = Total > 0 || Items.Count == 0
+            ? $"{AnsweredCount.ToString(CultureInfo.InvariantCulture)} of {Total.ToString(CultureInfo.InvariantCulture)} answered"
+            : "All items answered or dismissed";
+        FooterText = $"{counted}{(hasMessage ? " + message" : "")} · Ctrl+Enter sends";
+        // Settled items with a filled box are still sent, so they count for the label.
+        SendLabel = Items.Any(i => i.IsFilled) ? "Send answers" : "Send message";
         var text = Compose();
         IsTooLong = text.Length > AnswerComposer.MaxChars;
         TooLongText = IsTooLong

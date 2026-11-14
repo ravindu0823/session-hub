@@ -21,6 +21,7 @@ public sealed record IconState(IconKind Kind, int Count)
     /// <summary>Windows tray tooltips hold at most 127 characters.</summary>
     public const int MaxTooltipLength = 127;
 
+    /// <param name="totals">The effective totals (<see cref="HubViewModel.EffectiveTotals"/>): dismissed items left out.</param>
     /// <param name="hasSnapshot">
     /// False until the first snapshot arrives: the meta is then a placeholder, not "daemon stopped".
     /// </param>
@@ -69,7 +70,8 @@ public sealed record IconState(IconKind Kind, int Count)
 
     private static string Describe(SessionViewModel s)
     {
-        if (s.WaitingCount > 0 && s.NeedsApproval) return $"{s.Name} ({s.WaitingCount}, approval)";
-        return s.WaitingCount > 0 ? $"{s.Name} ({s.WaitingCount})" : $"{s.Name} (approval)";
+        var n = s.EffectiveWaitingCount;
+        if (n > 0 && s.NeedsApproval) return $"{s.Name} ({n}, approval)";
+        return n > 0 ? $"{s.Name} ({n})" : $"{s.Name} (approval)";
     }
 }

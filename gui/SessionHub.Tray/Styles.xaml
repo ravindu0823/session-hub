@@ -279,6 +279,50 @@
         </Setter>
     </Style>
 
+    <!-- Quiet text button: muted 12 px, accent on hover ("Dismiss" on a waiting item). -->
+    <Style x:Key="QuietLinkButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Padding="2,1">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The accent link at 12 px ("Undo" on a dismissed item). -->
+    <Style x:Key="SmallLinkButton" TargetType="Button" BasedOn="{StaticResource LinkButton}">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Padding="2,1">
+                        <ContentPresenter />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 30 px accent pill (one waiting item's own Send). -->
+    <Style x:Key="TinyPrimaryButton" TargetType="Button" BasedOn="{StaticResource SmallPrimaryButton}">
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Padding" Value="11,0" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
     <!-- Segment in a pill track (tabs, filter chips). The checked one is accent-fill with white text. -->
     <Style x:Key="Segment" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{DynamicResource Text2}" />
@@ -492,13 +536,35 @@
         </Setter>
     </Style>
 
-    <!-- One "Waiting on you" item: the id in bold amber, then the text; sub-items under it. -->
+    <!--
+        "Answered" or "Dismissed" tag of a waiting item (DataContext: AnswerItemViewModel); collapsed for an
+        open item. Answered is green, dismissed is grey. The tooltip says what the tag means.
+    -->
+    <DataTemplate x:Key="StateTagTemplate">
+        <Border x:Name="tag" CornerRadius="999" Padding="7,0,7,1" BorderThickness="1" Background="{DynamicResource Surface2}"
+                BorderBrush="{DynamicResource Line}" ToolTip="{Binding TagToolTip}" ToolTipService.InitialShowDelay="300"
+                Visibility="{Binding TagText, Converter={StaticResource EmptyToCollapsed}}">
+            <TextBlock x:Name="label" Text="{Binding TagText}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Muted}" />
+        </Border>
+        <DataTemplate.Triggers>
+            <DataTrigger Binding="{Binding IsAnswered}" Value="True">
+                <Setter TargetName="tag" Property="Background" Value="{DynamicResource GreenSoft}" />
+                <Setter TargetName="tag" Property="BorderBrush" Value="Transparent" />
+                <Setter TargetName="label" Property="Foreground" Value="{DynamicResource Green}" />
+            </DataTrigger>
+        </DataTemplate.Triggers>
+    </DataTemplate>
+
+    <!--
+        One "Waiting on you" item (DataContext: AnswerItemViewModel): the id in bold amber, then the text;
+        sub-items under it. An answered or dismissed item is muted and carries its tag after the id.
+    -->
     <DataTemplate x:Key="WaitingItemTemplate">
         <StackPanel Margin="0,2">
-            <TextBlock TextWrapping="Wrap">
-                <Run Text="{Binding Id, Mode=OneWay, StringFormat='{}{0} ', TargetNullValue=''}" FontWeight="Bold" Foreground="{DynamicResource Amber}" /><Run Text="{Binding Text, Mode=OneWay}" />
+            <TextBlock x:Name="line" TextWrapping="Wrap">
+                <Run x:Name="id" Text="{Binding Id, Mode=OneWay, StringFormat='{}{0} ', TargetNullValue=''}" FontWeight="Bold" Foreground="{DynamicResource Amber}" /><InlineUIContainer BaselineAlignment="Center"><ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource StateTagTemplate}" Margin="0,0,6,0" Visibility="{Binding TagText, Converter={StaticResource EmptyToCollapsed}}" /></InlineUIContainer><Run Text="{Binding Text, Mode=OneWay}" />
             </TextBlock>
-            <ItemsControl ItemsSource="{Binding Children}" Margin="14,0,0,0">
+            <ItemsControl x:Name="children" ItemsSource="{Binding Children}" Margin="14,0,0,0">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <TextBlock Text="{Binding StringFormat='• {0}'}" TextWrapping="Wrap" Foreground="{DynamicResource Text2}" />
@@ -506,6 +572,13 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </StackPanel>
+        <DataTemplate.Triggers>
+            <DataTrigger Binding="{Binding IsSettled}" Value="True">
+                <Setter TargetName="line" Property="Foreground" Value="{DynamicResource Muted}" />
+                <Setter TargetName="id" Property="Foreground" Value="{DynamicResource Muted}" />
+                <Setter TargetName="children" Property="Opacity" Value="0.7" />
+            </DataTrigger>
+        </DataTemplate.Triggers>
     </DataTemplate>
 
     <!-- A message bubble: yours on the right in accent-soft, the session's on the left in surface-2. -->
@@ -567,7 +640,7 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
-                <ItemsControl ItemsSource="{Binding Session.Waiting}" ItemTemplate="{StaticResource WaitingItemTemplate}" Margin="0,8,0,0"
+                <ItemsControl ItemsSource="{Binding Answers.Items}" ItemTemplate="{StaticResource WaitingItemTemplate}" Margin="0,8,0,0"
                               Visibility="{Binding HasWaiting, Converter={StaticResource Visible}}" />
             </StackPanel>
         </Border>
@@ -658,7 +731,7 @@
     <!-- The "Waiting on you" box gets the amber edge while questions are open. DataContext: CardViewModel. -->
     <Style x:Key="WaitingBox" TargetType="Border" BasedOn="{StaticResource StatusBox}">
         <Style.Triggers>
-            <DataTrigger Binding="{Binding HasWaiting}" Value="True">
+            <DataTrigger Binding="{Binding HasOpenWaiting}" Value="True">
                 <Setter Property="BorderBrush" Value="{DynamicResource AmberEdge}" />
             </DataTrigger>
         </Style.Triggers>

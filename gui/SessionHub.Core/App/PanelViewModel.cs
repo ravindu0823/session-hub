@@ -48,6 +48,7 @@ public sealed class PanelViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(hub);
         Hub = hub;
+        hub.DismissedChanged += OnDismissedChanged;
     }
 
     /// <summary>Raised when an open card needs its last exchange (opened, or a new reply arrived).</summary>
@@ -112,8 +113,31 @@ public sealed class PanelViewModel : ObservableObject
         _ => "Send an info-only message to a session.",
     };
 
-    /// <summary>Badge of the Waiting tab: open items plus open approvals.</summary>
-    public int WaitingTotal => Hub.Totals.WaitingItems + Hub.Totals.NeedsApproval;
+    /// <summary>Badge of the Waiting tab: open items (dismissed ones left out) plus open approvals.</summary>
+    public int WaitingTotal
+    {
+        get
+        {
+            var t = Hub.EffectiveTotals;
+            return t.WaitingItems + t.NeedsApproval;
+        }
+    }
+
+    /// <summary>
+    /// "1 relay message reached the wrong session (see relay.log)" while the daemon counts any such
+    /// delivery; empty otherwise.
+    /// </summary>
+    public string RelayStrayText
+    {
+        get
+        {
+            var n = Hub.Meta.RelayStrayCount;
+            if (n <= 0) return "";
+            return n == 1
+                ? "1 relay message reached the wrong session (see relay.log)"
+                : $"{n.ToString(System.Globalization.CultureInfo.InvariantCulture)} relay messages reached the wrong session (see relay.log)";
+        }
+    }
 
     public string Summary
     {
@@ -232,7 +256,16 @@ public sealed class PanelViewModel : ObservableObject
 
         RaiseLink();
         Raise(nameof(WaitingTotal));
+        Raise(nameof(RelayStrayText));
         Refresh(reorder: !wasSnapshot);
+    }
+
+    /// <summary>The owner dismissed an item or undid it: recount, and move the session between groups.</summary>
+    private void OnDismissedChanged()
+    {
+        Raise(nameof(WaitingTotal));
+        // Only between snapshots, once every row has its card.
+        if (hasSnapshot && Hub.Sessions.All(cards.ContainsKey)) Refresh(reorder: false);
     }
 
     public void SetHealth(BridgeHealth value)

@@ -254,6 +254,9 @@
                     <TextBlock Margin="16,8,12,0" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Red}"
                                Text="{Binding FooterWarning}" TextTrimming="CharacterEllipsis"
                                Visibility="{Binding FooterWarning, Converter={StaticResource EmptyToCollapsed}}" />
+                    <TextBlock Margin="16,8,12,0" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Red}"
+                               Text="{Binding RelayStrayText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelayStrayText}"
+                               Visibility="{Binding RelayStrayText, Converter={StaticResource EmptyToCollapsed}}" />
                     <Grid Margin="16,8,12,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

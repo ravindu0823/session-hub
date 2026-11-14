@@ -77,10 +77,14 @@ public sealed class SendCoordinator
     /// <paramref name="allowSecret"/> skips the bridge's secret check; only <see cref="SendSecretAnywayAsync"/>
     /// and <see cref="OverrideAsync"/> set it, for text the owner already chose to send.
     /// </summary>
-    public async Task SendAsync(CardViewModel card, bool overrideInFlight = false, bool allowSecret = false)
+    /// <param name="itemKey">
+    /// Set for one item's own Send: only that item's answer goes (<see cref="AnswerFormViewModel.CaptureOne"/>),
+    /// and only its box is cleared afterwards.
+    /// </param>
+    public async Task SendAsync(CardViewModel card, bool overrideInFlight = false, bool allowSecret = false, string? itemKey = null)
     {
         ArgumentNullException.ThrowIfNull(card);
-        var payload = card.Answers.Capture();
+        var payload = Capture(card, itemKey);
         var text = payload.Text;
         if (string.IsNullOrWhiteSpace(text)) return;
         if (text.Length > AnswerComposer.MaxChars)
@@ -109,10 +113,10 @@ public sealed class SendCoordinator
 
         if (!reply.Ok)
         {
-            card.ShowSendError(reply.Error?.Code ?? "unknown", reply.Error?.Message, new SendAttempt(text, overrideInFlight, allowSecret));
+            card.ShowSendError(reply.Error?.Code ?? "unknown", reply.Error?.Message, new SendAttempt(text, overrideInFlight, allowSecret, itemKey));
 
             // Answers or message typed while the request was out were not checked: "Send anyway" must not cover them.
-            if (card.Answers.Capture().Text != text) card.SendBox.TextEdited();
+            if (Capture(card, itemKey).Text != text) card.SendBox.TextEdited();
             return;
         }
 
@@ -143,6 +147,17 @@ public sealed class SendCoordinator
         if (restarts != restartsBefore) Settle(result.SendId);
     }
 
+    /// <summary>
+    /// One item's own Send: <c>Answers:</c> and that item's line only, through the same checks, refusals
+    /// and state line as <see cref="SendAsync(CardViewModel, bool, bool, string?)"/>. Ignored while the card's
+    /// previous request is still out.
+    /// </summary>
+    public Task SendItemAsync(CardViewModel card, string itemKey)
+    {
+        ArgumentNullException.ThrowIfNull(itemKey);
+        return SendAsync(card, itemKey: itemKey);
+    }
+
     /// <summary>Starts the send a send-box action asks for.</summary>
     public Task SendAsync(CardViewModel card, SendMode mode) => mode switch
     {
@@ -162,13 +177,13 @@ public sealed class SendCoordinator
         ArgumentNullException.ThrowIfNull(card);
         var box = card.SendBox;
         if (!box.CanSendAnyway || box.Refused is not { } refused) return Task.CompletedTask;
-        if (refused.Text != card.Answers.Capture().Text)
+        if (refused.Text != Capture(card, refused.ItemKey).Text)
         {
             box.TextEdited();
             return Task.CompletedTask;
         }
 
-        return SendAsync(card, refused.Override, allowSecret: true);
+        return SendAsync(card, refused.Override, allowSecret: true, refused.ItemKey);
     }
 
     /// <summary>
@@ -178,9 +193,15 @@ public sealed class SendCoordinator
     public Task OverrideAsync(CardViewModel card)
     {
         ArgumentNullException.ThrowIfNull(card);
-        var allowSecret = card.SendBox.Refused is { AllowSecret: true } refused && refused.Text == card.Answers.Capture().Text;
-        return SendAsync(card, overrideInFlight: true, allowSecret);
+        var refused = card.SendBox.Refused;
+        var itemKey = refused?.ItemKey;
+        var allowSecret = refused is { AllowSecret: true } && refused.Text == Capture(card, itemKey).Text;
+        return SendAsync(card, overrideInFlight: true, allowSecret, itemKey);
     }
+
+    /// <summary>What a send takes now: the whole form, or one item's answer.</summary>
+    private static SendPayload Capture(CardViewModel card, string? itemKey) =>
+        itemKey is null ? card.Answers.Capture() : card.Answers.CaptureOne(itemKey);
 
     public void OnSendChanged(SendUpdate update)
     {

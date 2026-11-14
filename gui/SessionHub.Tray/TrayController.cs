@@ -55,8 +55,16 @@ internal sealed class TrayController : IPanelHost, IWindowHost
         settings = store.Load();
         balloons.Notifications = settings.Notifications;
 
-        Hub = new HubViewModel(settings.Drafts, settings.DraftsSeen);
+        Hub = new HubViewModel(settings.Drafts, settings.DraftsSeen, savedDismissed: settings.Dismissed);
         Hub.DraftChanged += (_, _) => SaveSoon();
+        Hub.DismissedChanged += () => Guard("dismissed", () =>
+        {
+            // A restored item is not news: move the balloon baseline without showing one.
+            planner.Rebase(Hub.IsDismissed);
+            SaveSoon();
+            UpdateIcon();
+            CommandManager.InvalidateRequerySuggested();
+        });
         Panel = new PanelViewModel(Hub);
         Panel.ExchangeWanted += card => _ = FetchExchangeAsync(card);
         Window = new WindowViewModel(Panel);
@@ -197,12 +205,17 @@ internal sealed class TrayController : IPanelHost, IWindowHost
             : $"No terminal window found for {session.Name}.");
     }
 
-    public async Task SendAsync(CardViewModel card, SendMode mode)
+    public Task SendAsync(CardViewModel card, SendMode mode) => RunSendAsync(card, () => Sends.SendAsync(card, mode));
+
+    /// <summary>One waiting item's own Send button.</summary>
+    public Task SendItemAsync(CardViewModel card, string itemKey) => RunSendAsync(card, () => Sends.SendItemAsync(card, itemKey));
+
+    private async Task RunSendAsync(CardViewModel card, Func<Task> send)
     {
         if (!Panel.CanSend) return;
         try
         {
-            await Sends.SendAsync(card, mode);
+            await send();
             if (Sends.IsWatching) sendSweep.Start();
         }
         catch (Exception e)
@@ -264,6 +277,7 @@ internal sealed class TrayController : IPanelHost, IWindowHost
         {
             settings.Drafts = Hub.Drafts.ToDictionary();
             settings.DraftsSeen = Hub.DraftsSeen.ToDictionary();
+            settings.Dismissed = [.. Hub.Dismissed];
             store.Save(settings);
             store.Dispose();
         }
@@ -290,13 +304,14 @@ internal sealed class TrayController : IPanelHost, IWindowHost
     {
         var now = DateTimeOffset.Now;
         Panel.Apply(snapshot, now);
-        if (Hub.TakeSeenSaveDue()) SaveSoon();
+        // Both flags are taken (no short circuit): each is reset when read.
+        if (Hub.TakeSeenSaveDue() | Hub.TakeDismissedSaveDue()) SaveSoon();
         Window.Refresh(reorder: false);
         UpdateIcon();
         CommandManager.InvalidateRequerySuggested(); // a session that ended can no longer Jump
         // At most one balloon per snapshot (several sessions share one). ShowBalloonTip throws on an
         // empty text, so the planner's default line stands in for one.
-        foreach (var note in planner.Plan(snapshot, balloons, now))
+        foreach (var note in planner.Plan(snapshot, balloons, now, Hub.IsDismissed))
         {
             balloonSession = note.SessionId;
             var text = string.IsNullOrWhiteSpace(note.Text) ? BalloonPlanner.DefaultText : note.Text;
@@ -333,7 +348,8 @@ internal sealed class TrayController : IPanelHost, IWindowHost
     private void UpdateIcon()
     {
         var health = client.Health ?? new BridgeHealth.Restarting(0, TimeSpan.Zero);
-        var state = IconState.From(Hub.Meta, Hub.Totals, health, Hub.HasSnapshot);
+        var totals = Hub.EffectiveTotals;
+        var state = IconState.From(Hub.Meta, totals, health, Hub.HasSnapshot);
         if (state != shownIcon || trayIconSize != shownIconSize)
         {
             notifyIcon.Icon = icons.Get(state, trayIconSize);
@@ -341,7 +357,7 @@ internal sealed class TrayController : IPanelHost, IWindowHost
             shownIconSize = trayIconSize;
         }
 
-        var tip = IconState.Truncate(IconState.Tooltip(Hub.Meta, Hub.Totals, health, Hub.Sessions, Hub.HasSnapshot));
+        var tip = IconState.Truncate(IconState.Tooltip(Hub.Meta, totals, health, Hub.Sessions, Hub.HasSnapshot));
         if (notifyIcon.Text != tip) notifyIcon.Text = tip;
     }
 
@@ -394,6 +410,7 @@ internal sealed class TrayController : IPanelHost, IWindowHost
         {
             settings.Drafts = Hub.Drafts.ToDictionary();
             settings.DraftsSeen = Hub.DraftsSeen.ToDictionary();
+            settings.Dismissed = [.. Hub.Dismissed];
             store.Save(settings);
         }
         catch (Exception e)
@@ -406,6 +423,7 @@ internal sealed class TrayController : IPanelHost, IWindowHost
     {
         settings.Drafts = Hub.Drafts.ToDictionary();
         settings.DraftsSeen = Hub.DraftsSeen.ToDictionary();
+        settings.Dismissed = [.. Hub.Dismissed];
         store.ScheduleSave(settings);
     }
 

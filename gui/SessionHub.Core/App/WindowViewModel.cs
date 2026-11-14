@@ -83,6 +83,11 @@ public sealed class WindowViewModel : ObservableObject
             new WindowGroup(SessionGroup.Ended, "Ended (7 days)"),
         ];
         panel.PropertyChanged += OnPanelChanged;
+        // After the panel's own handler (it was built first), so every row has its card.
+        panel.Hub.DismissedChanged += () =>
+        {
+            if (panel.Hub.Sessions.All(s => panel.Card(s.SessionId) is not null)) Refresh(reorder: false);
+        };
     }
 
     /// <summary>The selection moved (null: no session left). The window loads that session's history and exchange.</summary>
@@ -159,6 +164,9 @@ public sealed class WindowViewModel : ObservableObject
             return newest > 0 ? $"{state} · last update {TimeText.Ago(newest, Panel.Now)}" : state;
         }
     }
+
+    /// <summary>Status bar warning after <see cref="StatusText"/>: " · 1 relay message reached the wrong session (see relay.log)".</summary>
+    public string StrayText => Panel.RelayStrayText.Length == 0 ? "" : " · " + Panel.RelayStrayText;
 
     public double ListWidth
     {
@@ -239,6 +247,7 @@ public sealed class WindowViewModel : ObservableObject
         Raise(nameof(HeaderSub));
         Raise(nameof(WaitingChip));
         Raise(nameof(StatusText));
+        Raise(nameof(StrayText));
     }
 
     /// <summary>Refreshes the "… ago" text of the status bar.</summary>
@@ -263,6 +272,9 @@ public sealed class WindowViewModel : ObservableObject
                 break;
             case nameof(PanelViewModel.WaitingTotal):
                 Raise(nameof(WaitingChip));
+                break;
+            case nameof(PanelViewModel.RelayStrayText):
+                Raise(nameof(StrayText));
                 break;
         }
     }

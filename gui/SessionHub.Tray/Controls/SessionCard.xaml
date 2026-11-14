@@ -108,7 +108,7 @@
                 <c:AnswerForm Compact="True" Margin="0,12,0,0" Visibility="{Binding Answers.IsActive, Converter={StaticResource Visible}}" />
                 <StackPanel Visibility="{Binding Answers.IsActive, Converter={StaticResource Hidden}}">
                     <TextBlock Style="{StaticResource SectionLabel}" Text="WAITING ON YOU" />
-                    <ItemsControl ItemsSource="{Binding Session.Waiting}" ItemTemplate="{StaticResource WaitingItemTemplate}"
+                    <ItemsControl ItemsSource="{Binding Answers.Items}" ItemTemplate="{StaticResource WaitingItemTemplate}"
                                   Visibility="{Binding HasWaiting, Converter={StaticResource Visible}}" />
                     <TextBlock Text="Nothing." Visibility="{Binding HasWaiting, Converter={StaticResource Hidden}}" />
                 </StackPanel>

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using SessionHub.Core.App;
 using SessionHub.Core.Protocol;
+using SessionHub.Core.Settings;
 
 namespace SessionHub.Core.ViewModels;
 
@@ -31,20 +32,28 @@ public sealed class HubViewModel : ObservableObject
 
     private readonly Dictionary<string, string> drafts;
     private readonly Dictionary<string, DateTimeOffset> seen = [];
+
+    // Dismissed items as AnswerComposer.DismissKey values, oldest first.
+    private readonly List<string> dismissed = [];
     private readonly TimeProvider time;
     private DateTimeOffset? lastSeenSave;
     private bool seenSaveDue;
+    private bool dismissedSaveDue;
+    private bool applying;
 
     /// <summary>
     /// Saved drafts (by session id, and answers by <c>&lt;session id&gt;#&lt;label&gt;</c>) seed new rows, so a
     /// row that comes back gets its text back. <paramref name="savedSeen"/> holds when each draft's session
     /// was last seen; a draft without an entry (a gui.json from before that field), or with a time in the
-    /// future, counts as seen now.
+    /// future, counts as seen now. <paramref name="savedDismissed"/> holds dismissed items
+    /// (<see cref="AnswerComposer.DismissKey"/>); one applies to its row while the row's status reply is the
+    /// one in the key.
     /// </summary>
     public HubViewModel(
         IReadOnlyDictionary<string, string>? savedDrafts = null,
         IReadOnlyDictionary<string, DateTimeOffset>? savedSeen = null,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        IEnumerable<string>? savedDismissed = null)
     {
         this.time = time ?? TimeProvider.System;
         drafts = savedDrafts is null ? [] : new Dictionary<string, string>(savedDrafts);
@@ -53,6 +62,47 @@ public sealed class HubViewModel : ObservableObject
         {
             seen[id] = savedSeen is not null && savedSeen.TryGetValue(id, out var at) && at < now ? at : now;
         }
+
+        foreach (var key in savedDismissed ?? [])
+        {
+            if (AnswerComposer.TryParseDismissKey(key, out _, out _, out _) && !dismissed.Contains(key)) dismissed.Add(key);
+        }
+
+        TrimDismissed();
+    }
+
+    /// <summary>
+    /// Raised when the owner dismisses an item or undoes it (not for the pruning a snapshot does). The app
+    /// saves and the views recount then.
+    /// </summary>
+    public event Action? DismissedChanged;
+
+    /// <summary>A copy of the dismissed items (<see cref="AnswerComposer.DismissKey"/>), oldest first.</summary>
+    public IReadOnlyList<string> Dismissed => [.. dismissed];
+
+    /// <summary>
+    /// <see cref="Totals"/> with the dismissed items that are not answered taken off the waiting items:
+    /// the number the icon, the badges and the headers show.
+    /// </summary>
+    public Totals EffectiveTotals
+    {
+        get
+        {
+            var off = Sessions.Where(s => s.IsLive).Sum(s => s.WaitingCount - s.EffectiveWaitingCount);
+            return off == 0 ? totals : totals with { WaitingItems = Math.Max(0, totals.WaitingItems - off) };
+        }
+    }
+
+    /// <summary>The item with this draft label is dismissed in that session (for its current status reply).</summary>
+    public bool IsDismissed(string sessionId, string label) =>
+        Sessions.FirstOrDefault(s => s.SessionId == sessionId)?.IsDismissed(label) == true;
+
+    /// <summary>True, once, after a snapshot dropped dismissals (a new status reply, or the session gone).</summary>
+    public bool TakeDismissedSaveDue()
+    {
+        var due = dismissedSaveDue;
+        dismissedSaveDue = false;
+        return due;
     }
 
     /// <summary>
@@ -93,6 +143,19 @@ public sealed class HubViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(snapshot);
 
         HasSnapshot = true;
+        applying = true;
+        try
+        {
+            ApplyCore(snapshot);
+        }
+        finally
+        {
+            applying = false;
+        }
+    }
+
+    private void ApplyCore(HubSnapshot snapshot)
+    {
 
         // Meta and totals first, so a collection handler never sees new rows with old totals.
         if (!MetaEquals(meta, snapshot.Meta)) Meta = snapshot.Meta;
@@ -146,13 +209,66 @@ public sealed class HubViewModel : ObservableObject
                     if (key.StartsWith(prefix, StringComparison.Ordinal)) row.SetAnswer(key[prefix.Length..], text);
                 }
 
+                if (view.Status?.ReplyUuid is { } reply)
+                {
+                    foreach (var key in dismissed)
+                    {
+                        if (AnswerComposer.TryParseDismissKey(key, out var sid, out var label, out var uuid) && sid == view.SessionId && uuid == reply)
+                            row.SetDismissed(label, true);
+                    }
+                }
+
                 row.PropertyChanged += OnRowChanged;
                 row.AnswerChanged += (label, text) => OnAnswerChanged(row, label, text);
+                row.DismissedChanged += () => OnDismissedChanged(row);
                 Sessions.Insert(i, row);
             }
         }
 
+        PruneDismissed(snapshot, wanted);
         foreach (var id in expired) DraftChanged?.Invoke(id, "");
+    }
+
+    /// <summary>
+    /// Drops dismissals whose session moved on to another status reply, and, on a trusted snapshot (as
+    /// for drafts), those whose session is gone.
+    /// </summary>
+    private void PruneDismissed(HubSnapshot snapshot, Dictionary<string, SessionView> wanted)
+    {
+        var trusted = snapshot.Meta.Daemon == "running" && wanted.Count > 0;
+        var removed = dismissed.RemoveAll(key =>
+        {
+            if (!AnswerComposer.TryParseDismissKey(key, out var sid, out _, out var uuid)) return true;
+            if (wanted.TryGetValue(sid, out var view)) return view.Status?.ReplyUuid != uuid;
+            return trusted;
+        });
+        if (removed > 0) dismissedSaveDue = true;
+    }
+
+    /// <summary>Mirrors a row's dismissed labels into the saved keys.</summary>
+    private void OnDismissedChanged(SessionViewModel row)
+    {
+        var prefix = AnswerComposer.DraftKey(row.SessionId, "");
+        dismissed.RemoveAll(k => k.StartsWith(prefix, StringComparison.Ordinal));
+        if (row.ReplyUuid is { } reply)
+        {
+            foreach (var label in row.DismissedLabels) dismissed.Add(AnswerComposer.DismissKey(row.SessionId, label, reply));
+        }
+
+        TrimDismissed();
+        if (applying)
+        {
+            dismissedSaveDue = true;
+            return;
+        }
+
+        DismissedChanged?.Invoke();
+    }
+
+    /// <summary>Keeps the newest <see cref="GuiSettings.MaxDismissed"/>.</summary>
+    private void TrimDismissed()
+    {
+        if (dismissed.Count > GuiSettings.MaxDismissed) dismissed.RemoveRange(0, dismissed.Count - GuiSettings.MaxDismissed);
     }
 
     /// <summary>
@@ -269,5 +385,6 @@ public sealed class HubViewModel : ObservableObject
     private static bool Has(string? text, string q) => text?.Contains(q, StringComparison.OrdinalIgnoreCase) == true;
 
     private static bool MetaEquals(Meta a, Meta b) =>
-        a.Daemon == b.Daemon && a.UnknownCount == b.UnknownCount && a.UnknownVersion == b.UnknownVersion && a.Stale.SequenceEqual(b.Stale);
+        a.Daemon == b.Daemon && a.UnknownCount == b.UnknownCount && a.UnknownVersion == b.UnknownVersion
+        && a.RelayStrayCount == b.RelayStrayCount && a.Stale.SequenceEqual(b.Stale);
 }

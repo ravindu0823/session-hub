@@ -37,6 +37,9 @@ internal interface IWindowHost
 
     Task SendAsync(CardViewModel card, SendMode mode);
 
+    /// <summary>Sends one waiting item's answer on its own.</summary>
+    Task SendItemAsync(CardViewModel card, string itemKey);
+
     /// <summary>True when the daemon runs afterwards.</summary>
     Task<bool> TryStartDaemonAsync();
 
@@ -94,6 +97,13 @@ internal sealed partial class MainWindow : Window
             PanelCommands.SendSecretAnyway,
             (_, e) => On<CardViewModel>(e, c => _ = host.SendAsync(c, SendMode.AllowSecret)),
             (_, e) => e.CanExecute = CanSend(e.Parameter) && e.Parameter is CardViewModel { SendBox.CanSendAnyway: true }));
+        CommandBindings.Add(new CommandBinding(
+            PanelCommands.SendItem,
+            (_, e) => On<AnswerItemViewModel>(e, i =>
+            {
+                if (vm.Panel.Card(i.SessionId) is { } c) _ = host.SendItemAsync(c, i.Key);
+            }),
+            (_, e) => e.CanExecute = CanSendItem(e.Parameter)));
 
         vm.PropertyChanged += OnViewModelChanged;
         vm.Panel.PropertyChanged += OnPanelChanged;
@@ -168,6 +178,12 @@ internal sealed partial class MainWindow : Window
     private bool CanSend(object? parameter) =>
         vm.Panel.CanSend && parameter is CardViewModel { IsRequesting: false, Session.IsLive: true } card
         && (!card.Answers.IsActive || card.Answers.CanSend);
+
+    /// <summary>One item's Send: its box filled and within the limit, and its card free to send (as the main button).</summary>
+    private bool CanSendItem(object? parameter) =>
+        parameter is AnswerItemViewModel { CanSend: true } item
+        && vm.Panel.CanSend
+        && vm.Panel.Card(item.SessionId) is { IsRequesting: false, Session.IsLive: true };
 
     /// <summary>The Send tab's first box: the first answer box when questions wait, else the reply box.</summary>
     private void FocusSendInput()

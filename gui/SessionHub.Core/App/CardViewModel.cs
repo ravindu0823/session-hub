@@ -179,6 +179,9 @@ public sealed class CardViewModel : ObservableObject
 
     public bool HasWaiting => Session.Waiting.Count > 0;
 
+    /// <summary>Some waiting item is neither answered nor dismissed: the "Waiting on you" box gets the amber edge.</summary>
+    public bool HasOpenWaiting => Session.OpenItemCount > 0;
+
     public bool HasProgress
     {
         get => hasProgress;
@@ -318,6 +321,13 @@ public sealed class CardViewModel : ObservableObject
             case nameof(SessionViewModel.Waiting):
                 Raise(nameof(HasWaiting));
                 break;
+            case nameof(SessionViewModel.OpenItemCount):
+                Raise(nameof(HasOpenWaiting));
+                break;
+            case nameof(SessionViewModel.EffectiveWaitingCount):
+                // A dismissal or an undo in the tray changes the chips at once, not at the next snapshot.
+                Recompute();
+                break;
             case nameof(SessionViewModel.IsLive):
                 Raise(nameof(CanJump));
                 break;
@@ -333,12 +343,12 @@ public sealed class CardViewModel : ObservableObject
         IsUnknown = s.IsLive && s.State == "unknown";
         StatusChip = s.NeedsApproval ? new Chip("needs approval", ChipTone.Red)
             : !s.IsLive ? new Chip("ended", ChipTone.Grey)
-            : s.WaitingCount > 0 ? new Chip($"{s.WaitingCount} waiting on you", ChipTone.Amber)
+            : s.EffectiveWaitingCount > 0 ? new Chip($"{s.EffectiveWaitingCount} waiting on you", ChipTone.Amber)
             : s.State == "busy" ? new Chip("working", ChipTone.Accent)
             : new Chip("idle", ChipTone.Grey);
-        Edge = s.NeedsApproval ? CardEdge.Red : s.IsLive && s.WaitingCount > 0 ? CardEdge.Amber : CardEdge.None;
+        Edge = s.NeedsApproval ? CardEdge.Red : s.IsLive && s.EffectiveWaitingCount > 0 ? CardEdge.Amber : CardEdge.None;
         ListBadge = s.NeedsApproval ? new Chip("approve", ChipTone.Red)
-            : s.IsLive && s.WaitingCount > 0 ? new Chip(s.WaitingCount.ToString(CultureInfo.InvariantCulture), ChipTone.Amber)
+            : s.IsLive && s.EffectiveWaitingCount > 0 ? new Chip(s.EffectiveWaitingCount.ToString(CultureInfo.InvariantCulture), ChipTone.Amber)
             : null;
         ListSubText = $"{ProfileChip.Text} · {(string.IsNullOrEmpty(s.Phase) ? "no phase yet" : s.Phase)}";
 

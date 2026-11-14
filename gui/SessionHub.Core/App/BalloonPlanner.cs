@@ -19,9 +19,14 @@ public sealed class BalloonPlanner
     public const string DefaultText = "Open Session Hub to see it.";
 
     private Dictionary<string, (int Items, bool Approval)>? last;
+    private HubSnapshot? lastSnapshot;
 
     /// <summary>The balloon for this snapshot: none or one.</summary>
-    public IReadOnlyList<BalloonNote> Plan(HubSnapshot snapshot, BalloonGate gate, DateTimeOffset now)
+    /// <param name="isDismissed">
+    /// Whether the owner dismissed the item with this draft label in that session (session id, label). A
+    /// dismissed item that is not answered is taken off the session's count, and never named in a balloon.
+    /// </param>
+    public IReadOnlyList<BalloonNote> Plan(HubSnapshot snapshot, BalloonGate gate, DateTimeOffset now, Func<string, string, bool>? isDismissed = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(gate);
@@ -31,26 +36,62 @@ public sealed class BalloonPlanner
         foreach (var s in snapshot.Sessions)
         {
             var live = s.EndedAt is null;
-            var state = (Items: live ? s.WaitingCount : 0, Approval: live && s.State == "waiting");
+            var state = StateOf(s, isDismissed, out var open);
             if (!current.TryAdd(s.SessionId, state) || last is null || !live) continue;
             var before = last.TryGetValue(s.SessionId, out var b) ? b : (Items: 0, Approval: false);
             if (gate.ShouldShow(s.SessionId, before.Items, state.Items, before.Approval, state.Approval, now))
             {
-                notes.Add(Note(s, state.Items, state.Approval && !before.Approval && state.Items <= before.Items));
+                notes.Add(Note(s, open, state.Items, state.Approval && !before.Approval && state.Items <= before.Items));
                 risen.Add(s);
             }
         }
 
         last = current;
+        lastSnapshot = snapshot;
         return notes.Count <= 1 ? notes : [Combined(risen)];
     }
 
-    private static BalloonNote Note(SessionView s, int items, bool approvalOnly)
+    /// <summary>
+    /// After the owner dismissed or restored an item: takes the last snapshot's counts as the new
+    /// baseline without showing anything, so restoring an item never pops a balloon for it.
+    /// </summary>
+    public void Rebase(Func<string, string, bool>? isDismissed)
+    {
+        if (last is null || lastSnapshot is null) return;
+        var current = new Dictionary<string, (int Items, bool Approval)>();
+        foreach (var s in lastSnapshot.Sessions) current.TryAdd(s.SessionId, StateOf(s, isDismissed, out _));
+        last = current;
+    }
+
+    private static (int Items, bool Approval) StateOf(SessionView s, Func<string, string, bool>? isDismissed, out List<WaitingItem> open)
+    {
+        var live = s.EndedAt is null;
+        open = OpenItems(s, isDismissed, out var dismissedOpen);
+        return (Items: live ? Math.Max(0, s.WaitingCount - dismissedOpen) : 0, Approval: live && s.State == "waiting");
+    }
+
+    /// <summary>The items neither answered nor dismissed, and how many unanswered ones are dismissed.</summary>
+    private static List<WaitingItem> OpenItems(SessionView s, Func<string, string, bool>? isDismissed, out int dismissedOpen)
+    {
+        dismissedOpen = 0;
+        var waiting = s.Status?.Waiting ?? [];
+        var labels = isDismissed is null || waiting.Count == 0 ? null : AnswerComposer.DraftLabels(waiting);
+        var open = new List<WaitingItem>(waiting.Count);
+        for (var i = 0; i < waiting.Count; i++)
+        {
+            if (waiting[i].Answered) continue;
+            if (labels is not null && isDismissed!(s.SessionId, labels[i])) dismissedOpen++;
+            else open.Add(waiting[i]);
+        }
+
+        return open;
+    }
+
+    private static BalloonNote Note(SessionView s, List<WaitingItem> open, int items, bool approvalOnly)
     {
         if (approvalOnly)
             return new BalloonNote(s.SessionId, $"{NameOf(s)} needs approval", "A permission prompt is open in its terminal.");
-        var waiting = s.Status?.Waiting;
-        var newest = waiting is { Count: > 0 } ? waiting[^1] : null;
+        var newest = open.Count > 0 ? open[^1] : null;
         var text = newest is null || string.IsNullOrWhiteSpace(newest.Text)
             ? DefaultText
             : newest.Id is null ? newest.Text : $"{newest.Id}: {newest.Text}";

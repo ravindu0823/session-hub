@@ -13,6 +13,9 @@ public static class PanelCommands
     public static readonly RoutedUICommand Send = new("Send", nameof(Send), typeof(PanelCommands));
     public static readonly RoutedUICommand SendAnyway = new("Send anyway", nameof(SendAnyway), typeof(PanelCommands));
 
+    /// <summary>One waiting item's own Send button. The parameter is the item (an AnswerItemViewModel), not the card.</summary>
+    public static readonly RoutedUICommand SendItem = new("Send this answer", nameof(SendItem), typeof(PanelCommands));
+
     /// <summary>"Send anyway" after the secret warning. A button click only: it has no key gesture, and Enter never runs it.</summary>
     public static readonly RoutedUICommand SendSecretAnyway = new("Send anyway", nameof(SendSecretAnyway), typeof(PanelCommands));
     public static readonly RoutedUICommand Jump = new("Jump to terminal", nameof(Jump), typeof(PanelCommands));
@@ -30,6 +33,9 @@ internal interface IPanelHost
     void Jump(SessionViewModel session);
 
     Task SendAsync(CardViewModel card, SendMode mode);
+
+    /// <summary>Sends one waiting item's answer on its own.</summary>
+    Task SendItemAsync(CardViewModel card, string itemKey);
 
     Task StartDaemonAsync();
 

@@ -85,11 +85,8 @@ public static class AnswerComposer
         var lines = new List<string>();
         for (var i = 0; i < items.Count; i++)
         {
-            var answer = Lines(i < answers.Count ? answers[i] : null);
-            if (answer.Length == 0) continue;
-            // Continuation lines are indented by two spaces; blank lines stay empty.
-            var indented = answer.Split('\n').Select((l, n) => n == 0 || l.Length == 0 ? l : "  " + l);
-            lines.Add($"{labels[i]}: {string.Join('\n', indented)}");
+            var line = AnswerLine(labels[i], i < answers.Count ? answers[i] : null);
+            if (line.Length > 0) lines.Add(line);
         }
 
         var text = new StringBuilder();
@@ -104,11 +101,54 @@ public static class AnswerComposer
         return text.ToString();
     }
 
+    /// <summary>
+    /// The text that answers one item on its own: <c>Answers:</c> and its <c>label: answer</c> line, with
+    /// the label it has in the whole list (<see cref="Labels"/>). Empty when the answer is blank.
+    /// </summary>
+    public static string ComposeOne(string label, string? answer)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        var line = AnswerLine(label, answer);
+        return line.Length == 0 ? "" : "Answers:\n" + line;
+    }
+
     /// <summary>What the session receives: the relay's header, a blank line, the text.</summary>
     public static string Preview(string text) => $"{MessageHeader}\n\n{text}";
 
     /// <summary>The <c>GuiSettings.Drafts</c> key of an answer.</summary>
     public static string DraftKey(string sessionId, string label) => $"{sessionId}#{label}";
+
+    /// <summary>
+    /// The <c>GuiSettings.Dismissed</c> key of a dismissed item: session, draft label and the status reply it
+    /// came from, so a new status reply from the session leaves the old dismissals behind.
+    /// </summary>
+    public static string DismissKey(string sessionId, string label, string replyUuid) => $"{sessionId}#{label}@{replyUuid}";
+
+    /// <summary>
+    /// Splits a <see cref="DismissKey"/>. The session ends at the first "#", the reply starts after the last
+    /// "@" (a draft label can hold "@" itself: <c>text@1a2b3c4d</c>). False for anything else.
+    /// </summary>
+    public static bool TryParseDismissKey(string? key, out string sessionId, out string label, out string replyUuid)
+    {
+        sessionId = label = replyUuid = "";
+        if (string.IsNullOrEmpty(key)) return false;
+        var hash = key.IndexOf('#', StringComparison.Ordinal);
+        var at = key.LastIndexOf('@');
+        if (hash <= 0 || at <= hash + 1 || at == key.Length - 1) return false;
+        sessionId = key[..hash];
+        label = key[(hash + 1)..at];
+        replyUuid = key[(at + 1)..];
+        return true;
+    }
+
+    /// <summary>One <c>label: answer</c> line; continuation lines are indented by two spaces, blank lines stay empty.</summary>
+    private static string AnswerLine(string label, string? answer)
+    {
+        var text = Lines(answer);
+        if (text.Length == 0) return "";
+        var indented = text.Split('\n').Select((l, n) => n == 0 || l.Length == 0 ? l : "  " + l);
+        return $"{label}: {string.Join('\n', indented)}";
+    }
 
     private static string TextHash(string text) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..8];

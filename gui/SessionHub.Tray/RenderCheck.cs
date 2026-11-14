@@ -55,7 +55,8 @@ internal static class RenderCheck
                     }
                 }
 
-                // The answer form in an expanded card, with synthetic questions (two answered).
+                // The answer form in an expanded card, with synthetic questions: one answered in the terminal,
+                // one dismissed, one filled box.
                 foreach (var dpi in new[] { 96, 144 })
                 {
                     var file = Path.Combine(outDir, $"panel-answers-{(light ? "light" : "dark")}-{dpi}.png");
@@ -91,14 +92,18 @@ internal static class RenderCheck
                     report.Add(file);
                 }
 
-                // The Send tab's answer form (synthetic questions, two answered), and the plain reply box
-                // of a session nothing waits on.
+                // The Send tab's answer form (answered, dismissed, filled and open items), the same session's
+                // Status tab, and the plain reply box of a session nothing waits on.
                 foreach (var (width, dpi) in new[] { (1000, 96), (720, 144) })
                 {
                     var file = Path.Combine(outDir, $"window-answers-{width}-{tone}-{dpi}.png");
                     RenderWindow(app, answers, history, now, WindowTab.Send, width, dpi, ended: false, file, fillAnswers: true, height: 1180);
                     report.Add(file);
                 }
+
+                var answersStatus = Path.Combine(outDir, $"window-answers-status-1000-{tone}-96.png");
+                RenderWindow(app, answers, history, now, WindowTab.Status, 1000, 96, ended: false, answersStatus, fillAnswers: true, height: 800);
+                report.Add(answersStatus);
 
                 var replyFile = Path.Combine(outDir, $"window-reply-1000-{tone}-96.png");
                 RenderWindow(app, snapshot, history, now, WindowTab.Send, 1000, 96, ended: false, replyFile, pickIdle: true);
@@ -216,17 +221,14 @@ internal static class RenderCheck
                 : snapshot.Sessions.FirstOrDefault(s => s.Status is not null) ?? first;
         if (pick is not null) vm.Select(pick.SessionId);
         vm.Tab = tab;
-        if (tab == WindowTab.Send && vm.Selected is { } card)
+        if (fillAnswers && vm.Selected is { } filled)
         {
-            if (fillAnswers)
-            {
-                FillAnswers(card);
-            }
-            else
-            {
-                card.Session.Draft = "Status please. Keep it short.";
-                card.ShowSend("pending", null);
-            }
+            FillAnswers(filled);
+        }
+        else if (tab == WindowTab.Send && vm.Selected is { } card)
+        {
+            card.Session.Draft = "Status please. Keep it short.";
+            card.ShowSend("pending", null);
         }
 
         var window = new MainWindow(new WindowHost(exchange), vm)
@@ -258,30 +260,32 @@ internal static class RenderCheck
 
     /// <summary>
     /// The fixture with synthetic "Waiting on you" items on its first live session with a status: IDs,
-    /// a hyphenated one, and one without an ID that has sub-items.
+    /// a hyphenated one, one answered in the terminal (DB-Q1, so the daemon counts three), and one
+    /// without an ID that has sub-items; and one relay message that reached the wrong session.
     /// </summary>
     private static HubSnapshot WithQuestions(HubSnapshot snapshot)
     {
         WaitingItem[] questions =
         [
             new("AUTH-Q1", "Approve the auth direction (harden the current tokens first, a new identity server later only if needed)?", true, []),
-            new("DB-Q1", "Stay on the current database and reduce the lock-in as we go, or start the per-service migration now?", false, []),
+            new("DB-Q1", "Stay on the current database and reduce the lock-in as we go, or start the per-service migration now?", false, [], Answered: true),
             new("OPS-Q3", "OK to ask the three vendors for their maintenance windows? Who is the contact for each?", false, []),
             new(null, "Pick a date for the cutover window.", false, ["Weekday after 22:00", "Weekend morning"]),
         ];
         var target = snapshot.Sessions.First(s => s.Status is not null && s.EndedAt is null);
         var sessions = snapshot.Sessions
             .Select(s => s.SessionId == target.SessionId
-                ? s with { WaitingCount = questions.Length, Status = s.Status! with { Waiting = questions } }
+                ? s with { WaitingCount = questions.Count(q => !q.Answered), Status = s.Status! with { Waiting = questions } }
                 : s)
             .ToList();
-        return snapshot with { Sessions = sessions };
+        return snapshot with { Sessions = sessions, Meta = snapshot.Meta with { RelayStrayCount = 1 } };
     }
 
+    /// <summary>AUTH-Q1 filled (open), OPS-Q3 dismissed; DB-Q1 is answered by the snapshot, the last item stays open.</summary>
     private static void FillAnswers(CardViewModel card)
     {
         card.Answers.Items[0].Answer = "Yes, harden the current tokens first.";
-        card.Answers.Items[1].Answer = "Stay on the current database for now.";
+        card.Answers.Items[2].Dismiss();
     }
 
     /// <summary>Synthetic history (no real data): messages of mixed length, the third newest marked shortened.</summary>
@@ -333,6 +337,8 @@ internal static class RenderCheck
 
         public Task SendAsync(CardViewModel card, SendMode mode) => Task.CompletedTask;
 
+        public Task SendItemAsync(CardViewModel card, string itemKey) => Task.CompletedTask;
+
         public Task<bool> TryStartDaemonAsync() => Task.FromResult(false);
 
         public Task<Reply> RequestAsync(BridgeRequest request, TimeSpan timeout) => Task.FromResult(
@@ -359,6 +365,8 @@ internal static class RenderCheck
         }
 
         public Task SendAsync(CardViewModel card, SendMode mode) => Task.CompletedTask;
+
+        public Task SendItemAsync(CardViewModel card, string itemKey) => Task.CompletedTask;
 
         public Task StartDaemonAsync() => Task.CompletedTask;
 
