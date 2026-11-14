@@ -66,7 +66,7 @@ flowchart LR
 
 ## Requirements
 
-| | |
+| Needs | Version |
 | --- | --- |
 | OS | Windows 11 |
 | Runtime | .NET 10 Desktop Runtime (the tray app is a framework-dependent single file) |
