@@ -1,0 +1,1636 @@
+[
+  {
+    "name": "status/extract.test.ts:recommendations deduped and capped at 5",
+    "input": "**Progress: about 5% overall. Phase: x.**\nI recommend option 0\nI recommend option 1\nI recommend option 2\nI recommend option 3\nI recommend option 4\nI recommend option 5\nI recommend option 6\nI recommend option 7\nI recommend option 0\n",
+    "output": {
+      "progressPct": 5,
+      "phase": "x",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": [
+        "I recommend option 0",
+        "I recommend option 1",
+        "I recommend option 2",
+        "I recommend option 3",
+        "I recommend option 4"
+      ]
+    }
+  },
+  {
+    "name": "status/extract.test.ts:recommendations deduped and capped at 5#2",
+    "input": "**Progress: about 5% overall. Phase: x.**\nMy Pick: A\nMy pick: A\nmy pick: A\n",
+    "output": {
+      "progressPct": 5,
+      "phase": "x",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": [
+        "My Pick: A",
+        "My pick: A",
+        "my pick: A"
+      ]
+    }
+  },
+  {
+    "name": "status/extract.test.ts:nothing in any case with period",
+    "input": "### What's remaining\nNOTHING.\n### Waiting on you\n- Nothing\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:one-line answer is null",
+    "input": "",
+    "output": null
+  },
+  {
+    "name": "status/extract.test.ts:section ends at next heading",
+    "input": "### What's remaining\n1. A\n## Other\n2. B\n### Waiting on you\n- Q1 ask\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "A"
+      ],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "ask",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:bold-line heading of other section ends section",
+    "input": "**What's remaining**\n1. A\n**Waiting on you**\n- Q1 ask\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "A"
+      ],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "ask",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:progress clamped and fence ignored",
+    "input": "**Progress: about 250% overall. Phase: p.**",
+    "output": {
+      "progressPct": 100,
+      "phase": "p",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:progress clamped and fence ignored#2",
+    "input": "```\n**Progress: about 50% overall. Phase: p.**\n```\n",
+    "output": null
+  },
+  {
+    "name": "status/extract.test.ts:IDs",
+    "input": "### Waiting on you\n- Q15 a\n- SH10: b\n- NT56: c\n- BM3: d\n- **New:** SH9: e\n- **SH4**: f\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q15",
+          "text": "a",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "SH10",
+          "text": "b",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "NT56",
+          "text": "c",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "BM3",
+          "text": "d",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "SH9",
+          "text": "e",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": "SH4",
+          "text": "f",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:trailing paragraph, thematic break and table do not merge into last item",
+    "input": "### Waiting on you\n- Q1 approve x\n\nThanks, ping me when ready.\n\n---\nfooter\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "approve x",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:trailing paragraph, thematic break and table do not merge into last item#2",
+    "input": "### Waiting on you\n- Q1 approve x\n---\n- Q2 no\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "approve x",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:trailing paragraph, thematic break and table do not merge into last item#3",
+    "input": "### Waiting on you\n- Q1 approve x\n| a | b |\n|---|---|\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "approve x",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:indented continuation after a blank line still joins",
+    "input": "### Waiting on you\n- Q1 approve x\n\n  and the rest\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "approve x and the rest",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:lead-in line before first bullet is dropped",
+    "input": "### Waiting on you\nThese need you:\n- Q1 a\n- Q2 b\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "a",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q2",
+          "text": "b",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:code spans and arithmetic are not corrupted",
+    "input": "### Waiting on you\n- Q1 approve `src/*.ts` and **bold** and 2 * 3 * 4 and snake_case_name\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "approve src/*.ts and bold and 2 * 3 * 4 and snake_case_name",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:code spans and arithmetic are not corrupted#2",
+    "input": "### Waiting on you\n- Q2 __x__ and _y_ and `**z**`\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q2",
+          "text": "x and y and **z**",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:repeated heading: last with content wins",
+    "input": "### Waiting on you\n- Q1 first\n### Waiting on you\n- Q2 second\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q2",
+          "text": "second",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:repeated heading: last with content wins#2",
+    "input": "### Waiting on you\n- Q1 first\n### Waiting on you\n- nothing\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "first",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:repeated heading: last with content wins#3",
+    "input": "### What's remaining\n1. A\n### What's remaining\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "A"
+      ],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:inline bold headings, bold hash headings and #### level",
+    "input": "**Waiting on you:** Q5 approve\n- Q6 more\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q5",
+          "text": "approve",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q6",
+          "text": "more",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:inline bold headings, bold hash headings and #### level#2",
+    "input": "**Waiting on you:** nothing\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:inline bold headings, bold hash headings and #### level#3",
+    "input": "### **Waiting on you**\n- Q1 a\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "a",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:inline bold headings, bold hash headings and #### level#4",
+    "input": "#### What's remaining\n1. A\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "A"
+      ],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:ID separators",
+    "input": "### Waiting on you\n- Q15, Q16: pick\n- **Q15** — x\n- Q15.5 y\n- Q15x z\n- SH9 - w\n- Q1-Q3 range\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q15",
+          "text": "Q16: pick",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q15",
+          "text": "x",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "Q15.5 y",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "Q15x z",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "SH9",
+          "text": "w",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "Q1-Q3 range",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:remaining children fold into parent",
+    "input": "### What's remaining\n1. Build\n   - a\n   - b\n2. Before CI:\n   - c\n3. Plain\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "Build: a; b",
+        "Before CI: c",
+        "Plain"
+      ],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:progress anchored at line start, decimals rounded",
+    "input": "**Progress: about 33.5% overall. Phase: p.**",
+    "output": {
+      "progressPct": 34,
+      "phase": "p",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:progress anchored at line start, decimals rounded#2",
+    "input": "see **Progress: about 50% overall. Phase: p.** quoted",
+    "output": null
+  },
+  {
+    "name": "status/extract.test.ts:progress anchored at line start, decimals rounded#3",
+    "input": "Progress: 40% overall. Phase: plain.",
+    "output": {
+      "progressPct": 40,
+      "phase": "plain",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:bold around ids and whole items",
+    "input": "### Waiting on you\n- **Q15:** text\n- **Q15 approve x**\n- **New:** **SH9:** go\n- **New: SH9** foo\n- SH1–SH8: answered.\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q15",
+          "text": "text",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q15",
+          "text": "approve x",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "SH9",
+          "text": "go",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": "SH9",
+          "text": "foo",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": "SH1",
+          "text": "SH1–SH8: answered.",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:code span at item start is never an id",
+    "input": "### Waiting on you\n- `Q15` stays open\n- `S3 bucket` needs a policy\n- `V8` upgrade\n- `H2: foo`\n- _Q15_ foo\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "Q15 stays open",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "S3 bucket needs a policy",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "V8 upgrade",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "H2: foo",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q15",
+          "text": "foo",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:hyphenated and multi-segment ids",
+    "input": "### Waiting on you\n- AUTH-Q1 pick a token lifetime\n- DB-Q1: which backup window\n- AB2-Q3, tool version\n- Q14 a\n- SH29 b\n- NT40 c\n- **AUTH-Q1:** bold id\n- New: **Q15** fresh\n- **New:** **DB-Q2** — also fresh\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "AUTH-Q1",
+          "text": "pick a token lifetime",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "DB-Q1",
+          "text": "which backup window",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AB2-Q3",
+          "text": "tool version",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q14",
+          "text": "a",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "SH29",
+          "text": "b",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "NT40",
+          "text": "c",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AUTH-Q1",
+          "text": "bold id",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q15",
+          "text": "fresh",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": "DB-Q2",
+          "text": "also fresh",
+          "isNew": true,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids",
+    "input": "### Waiting on you\n- OK go\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "OK go",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#2",
+    "input": "### Waiting on you\n- Q alone\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "Q alone",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#3",
+    "input": "### Waiting on you\n- A- dash\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "A- dash",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#4",
+    "input": "### Waiting on you\n- AUTH- dash\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "AUTH- dash",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#5",
+    "input": "### Waiting on you\n- 2FA on\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "2FA on",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#6",
+    "input": "### Waiting on you\n- q1 lower\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "q1 lower",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#7",
+    "input": "### Waiting on you\n- JavaScript upgrade\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "JavaScript upgrade",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#8",
+    "input": "### Waiting on you\n- AUTH-q1 lower\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "AUTH-q1 lower",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#9",
+    "input": "### Waiting on you\n- AUTH-QA no digit\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "AUTH-QA no digit",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#10",
+    "input": "### Waiting on you\n- AUTH--Q1 double dash\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "AUTH--Q1 double dash",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#11",
+    "input": "### Waiting on you\n- E2E tests\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "E2E tests",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#12",
+    "input": "### Waiting on you\n- ABCDEFGHI1 segment too long\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "ABCDEFGHI1 segment too long",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#13",
+    "input": "### Waiting on you\n- AB1-CD2-EF3-GH4-IJ5-KL6-MN7 longer than 24\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "AB1-CD2-EF3-GH4-IJ5-KL6-MN7 longer than 24",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "status/extract.test.ts:ranges keep the first id and the whole text, with the new id shapes",
+    "input": "### Waiting on you\n- Q5–Q8: answered.\n- Q1-Q3 range\n- AUTH-Q1–AUTH-Q4: answered.\n- AUTH-Q1-AUTH-Q3 hyphen range\n- AUTH-Q1-Q3 short range\n- AUTH-Q3-Q1 not ascending\n- AUTH-Q1-XQ3 other stem\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q5",
+          "text": "Q5–Q8: answered.",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "Q1-Q3 range",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AUTH-Q1",
+          "text": "AUTH-Q1–AUTH-Q4: answered.",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AUTH-Q1",
+          "text": "AUTH-Q1-AUTH-Q3 hyphen range",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AUTH-Q1",
+          "text": "AUTH-Q1-Q3 short range",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AUTH-Q3-Q1",
+          "text": "not ascending",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AUTH-Q1-XQ3",
+          "text": "other stem",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "focus:1",
+    "input": "**Progress: ٤٢% overall. Phase: x.**\n\n### Waiting on you\n- Q١: yes\n- Ｑ1: yes\n- Q1: ok\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "Q١: yes",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "Ｑ1: yes",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "ok",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "focus:2",
+    "input": "**Progress: about 5% overall. Phase: x.**\n\n### Waiting on you\n- Q12345678901234567890😀: x\n- Q1234567890123456789中文字: x\n- Q12345678901234567890123: exactly\n",
+    "output": {
+      "progressPct": 5,
+      "phase": "x",
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "Q12345678901234567890😀: x",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "Q1234567890123456789中文字: x",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "Q12345678901234567890123: exactly",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "focus:3",
+    "input": "**Progress: about 5% overall. Phase: x.**\n\n### Waiting on you\n- Q1: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxé tail\n- Q2: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀 tail\n",
+    "output": {
+      "progressPct": 5,
+      "phase": "x",
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxé tail",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q2",
+          "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀 tail",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:round 0.49999999999999994",
+    "input": "**Progress: 0.49999999999999994% overall. Phase: a.**",
+    "output": {
+      "progressPct": 0,
+      "phase": "a",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:round halves up",
+    "input": "**Progress: 2.5% overall. Phase: a.**\n### What's remaining\n- a\n",
+    "output": {
+      "progressPct": 3,
+      "phase": "a",
+      "remaining": [
+        "a"
+      ],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:round 99.5",
+    "input": "Progress: about 99.5% overall. Phase: **b**",
+    "output": {
+      "progressPct": 100,
+      "phase": "**b",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:round 100.5 clamped",
+    "input": "  *Progress: 100.5% overall.  Phase: c.",
+    "output": {
+      "progressPct": 100,
+      "phase": "c",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:crlf and lone trailing cr",
+    "input": "### Waiting on you\r\n- Q1 a\r\n- Q2 b\r",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "a - Q2 b",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:line separator in bullet",
+    "input": "### Waiting on you\n- Q1 a b\n- Q2 c\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q2",
+          "text": "c",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:nel is not js space, bom is",
+    "input": "### What's remaining\n﻿- a\n- b\n- c\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "a - b",
+        "c"
+      ],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:kelvin and long s do not fold",
+    "input": "### What’ſ remaining\n- a\n**Progress: 5% overall. Phase: x.**\nMy picK: z\nmy PICK: y\nRECOMMENDK w\n",
+    "output": {
+      "progressPct": 5,
+      "phase": "x",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": [
+        "my PICK: y",
+        "RECOMMENDK w"
+      ]
+    }
+  },
+  {
+    "name": "port:curly apostrophe heading",
+    "input": "## **What’s Remaining:** ##\n- a\n  - a1\n  - \n- b:\n  - b1\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "a: a1",
+        "b: b1"
+      ],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:underscores",
+    "input": "### Waiting on you\n- Q1 _a__ b_ __c__d __e_ f_g_ _h_\n- Q2 x_y_z _ a_ _b _ __ __\n- Q3 _é_ é_x_ (_y_) _z_. __w__\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "a_ b_ __c__d __e_ f_g_ h",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q2",
+          "text": "x_y_z _ a_ _b _ __ __",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q3",
+          "text": "é éx (y) z. w",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:stars",
+    "input": "### Waiting on you\n- Q1 ****x **y* *z** ***w*** * a * **\n- Q2 2*3*4 **b**c\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "*x y z w * a * **",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q2",
+          "text": "234 bc",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:code holder injection",
+    "input": "### Waiting on you\n- Q1 0 and `k` 1 99999999999999999999 007\n- Q2 `a`  `b`\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "k and k   ",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q2",
+          "text": "a b",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:new variants",
+    "input": "### Waiting on you\n- **New: SH9** foo\n- new:Q1 x\n- NEW:** Q2: y\n- **new:**Q3 – z\n- New: `Q4` code\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "SH9",
+          "text": "foo",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "x",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": "Q2",
+          "text": "y",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": "Q3",
+          "text": "z",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "Q4 code",
+          "isNew": true,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:id edges",
+    "input": "### Waiting on you\n- Q12a x\n- AB1-CD2-x y\n- Q1–Q3 ranged\n- Q1 – Q3 dash\n- Q1 ,b\n- Q1 -\n- Q1 —　x\n- AUTH-Q1-Q3 r\n- Q3-Q1 nr\n- Q1:\n- AB2-Q3 one\n- A1-B2-C3 x\n- ABCDEFGH1 long\n- AB12345678 x\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": null,
+          "text": "Q12a x",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AB1-CD2",
+          "text": "-x y",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "Q1–Q3 ranged",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "Q3 dash",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": ",b",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "-",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "x",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AUTH-Q1",
+          "text": "AUTH-Q1-Q3 r",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q3-Q1",
+          "text": "nr",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q1",
+          "text": "Q1:",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "AB2-Q3",
+          "text": "one",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "A1-B2-C3",
+          "text": "x",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "ABCDEFGH1 long",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "AB12345678 x",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:tabs and nesting",
+    "input": "### Waiting on you\n- Q1 top\n\t- child one\n\t  more child\n    - child two\n- Q2 next\n\n  continued\n\nafter\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "top",
+          "isNew": false,
+          "children": [
+            "child one more child",
+            "child two"
+          ]
+        },
+        {
+          "id": "Q2",
+          "text": "next continued",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:recommendation leads",
+    "input": "**Progress: 5% overall. Phase: x.**\n# recommend heading\n1) I recommend this\n• my pick x\n(recommended) ok\n- **Recommend:** `a b`\n2. \n",
+    "output": {
+      "progressPct": 5,
+      "phase": "x",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": [
+        "recommend heading",
+        "I recommend this",
+        "my pick x",
+        "(recommended) ok",
+        "Recommend: a b"
+      ]
+    }
+  },
+  {
+    "name": "port:fences",
+    "input": "**Progress: 5% overall. Phase: x.**\n   ```js\n### Waiting on you\n- Q1 hidden\n```\n### Waiting on you\n- Q2 shown\n```\nunclosed\n- Q3 hidden\n",
+    "output": {
+      "progressPct": 5,
+      "phase": "x",
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q2",
+          "text": "shown",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:bold heading rests",
+    "input": "**Waiting on you**: Q1 do it\n**What's remaining:** a\rb\n**What's remaining** c\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "c"
+      ],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "do it What's remaining: a b",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:unicode spaces",
+    "input": "### Waiting on you\n- Q1　x\n- Q2: y\n*\tQ3 z\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "x",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q2",
+          "text": "y",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q3",
+          "text": "z",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:only nothing",
+    "input": "**What's remaining:** _Nothing._\n**Waiting on you** **nothing**\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:plain paragraph items",
+    "input": "### What's remaining\nfirst line\ncontinues\n\nsecond para\n### Waiting on you\nQ1 plain\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "first line continues"
+      ],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "plain",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "port:table and break end section",
+    "input": "### Waiting on you\n- Q1 a\n***\n- Q2 b\n### What's remaining\n- r\n| t |\n- s\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "r"
+      ],
+      "waiting": [
+        {
+          "id": "Q1",
+          "text": "a",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "fixture:bold-headings.md",
+    "input": "Some body text.\n\n**What's remaining**\n1. Do the thing.\n2. Do the other thing.\n\n**Waiting on you**\n* Q2: Pick one\n• Q3: Pick two\n",
+    "output": {
+      "progressPct": null,
+      "phase": null,
+      "remaining": [
+        "Do the thing.",
+        "Do the other thing."
+      ],
+      "waiting": [
+        {
+          "id": "Q2",
+          "text": "Pick one",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "Q3",
+          "text": "Pick two",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "fixture:full.md",
+    "input": "**Progress: about 25% overall. Phase: build, Task 1 of 15 (scaffold) running.**\n\nScaffold is in. I **recommend** keeping Bun for the runner.\n\n| Item | State |\n|---|---|\n| lint | green |\n\n```\n### Waiting on you\n- ZZ99: inside a fence, must be ignored\n```\n\n### What's remaining\n1. Tasks 1-13: build with review (Task 1 running now).\n2. Task 14: install on this PC\n   and real end-to-end test.\n\n### Waiting on you\n- SH1–SH8: answered.\n- **New:** SH9: Do you approve the design doc as written?\n- Q15 Pick a region (Recommended)\n- NT56 `push` the *plan*\n- Plain question without an id\n",
+    "output": {
+      "progressPct": 25,
+      "phase": "build, Task 1 of 15 (scaffold) running",
+      "remaining": [
+        "Tasks 1-13: build with review (Task 1 running now).",
+        "Task 14: install on this PC and real end-to-end test."
+      ],
+      "waiting": [
+        {
+          "id": "SH1",
+          "text": "SH1–SH8: answered.",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "SH9",
+          "text": "Do you approve the design doc as written?",
+          "isNew": true,
+          "children": []
+        },
+        {
+          "id": "Q15",
+          "text": "Pick a region (Recommended)",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": "NT56",
+          "text": "push the plan",
+          "isNew": false,
+          "children": []
+        },
+        {
+          "id": null,
+          "text": "Plain question without an id",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": [
+        "Scaffold is in. I recommend keeping Bun for the runner.",
+        "Q15 Pick a region (Recommended)"
+      ]
+    }
+  },
+  {
+    "name": "fixture:nested.md",
+    "input": "**Progress: 60% overall. Phase: CI setup.**\n\n### What’s remaining\n- Wire the runner.\n\n### Waiting on you\n- **New:** SH10: Before CI can run:\n  - create the repo\n  - register the runner\n    with the token\n- BM3: Confirm label\n",
+    "output": {
+      "progressPct": 60,
+      "phase": "CI setup",
+      "remaining": [
+        "Wire the runner."
+      ],
+      "waiting": [
+        {
+          "id": "SH10",
+          "text": "Before CI can run:",
+          "isNew": true,
+          "children": [
+            "create the repo",
+            "register the runner with the token"
+          ]
+        },
+        {
+          "id": "BM3",
+          "text": "Confirm label",
+          "isNew": false,
+          "children": []
+        }
+      ],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "fixture:nothing.md",
+    "input": "**Progress: about 100% overall. Phase: done.**\n\nAll shipped.\n\n## What's remaining\nNothing.\n\n## Waiting on you\n- nothing\n",
+    "output": {
+      "progressPct": 100,
+      "phase": "done",
+      "remaining": [],
+      "waiting": [],
+      "recommendations": []
+    }
+  },
+  {
+    "name": "fixture:oneliner.md",
+    "input": "Yes, the port is 8080.\n",
+    "output": null
+  }
+]

@@ -3,4 +3,4 @@ useDefault = true
 
 [allowlist]
 description = "Synthetic secrets in test fixtures"
-paths = ['''^test/fixtures/''']
+paths = ['''^test/fixtures/''', '''^crates/[^/]+/tests/(corpus|goldens)/''']

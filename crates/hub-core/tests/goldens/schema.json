@@ -1,0 +1,180 @@
+{
+  "version_storage": "schema_version table (rows of version); PRAGMA user_version is unused",
+  "schema_version_max": 5,
+  "schema_version_rows": [
+    {
+      "version": 1
+    },
+    {
+      "version": 2
+    },
+    {
+      "version": 3
+    },
+    {
+      "version": 4
+    },
+    {
+      "version": 5
+    }
+  ],
+  "pragma_user_version": 0,
+  "sqlite_master": [
+    {
+      "type": "table",
+      "name": "latest_reply",
+      "tbl_name": "latest_reply",
+      "sql": "CREATE TABLE latest_reply (\n  session_id TEXT PRIMARY KEY REFERENCES sessions(session_id) ON DELETE CASCADE,\n  reply_uuid TEXT NOT NULL,\n  reply_ts TEXT NOT NULL,\n  has_status INTEGER NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "messages",
+      "tbl_name": "messages",
+      "sql": "CREATE TABLE messages (\n  id INTEGER PRIMARY KEY,\n  uuid TEXT NOT NULL UNIQUE,\n  session_id TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,\n  ts TEXT NOT NULL,\n  role TEXT NOT NULL,\n  from_name TEXT,\n  text TEXT NOT NULL\n)"
+    },
+    {
+      "type": "trigger",
+      "name": "messages_ad",
+      "tbl_name": "messages",
+      "sql": "CREATE TRIGGER messages_ad AFTER DELETE ON messages BEGIN\n  INSERT INTO messages_fts(messages_fts, rowid, text) VALUES ('delete', old.id, old.text);\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "messages_ai",
+      "tbl_name": "messages",
+      "sql": "CREATE TRIGGER messages_ai AFTER INSERT ON messages BEGIN\n  INSERT INTO messages_fts(rowid, text) VALUES (new.id, new.text);\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "messages_au",
+      "tbl_name": "messages",
+      "sql": "CREATE TRIGGER messages_au AFTER UPDATE OF text ON messages BEGIN\n  INSERT INTO messages_fts(messages_fts, rowid, text) VALUES ('delete', old.id, old.text);\n  INSERT INTO messages_fts(rowid, text) VALUES (new.id, new.text);\nEND"
+    },
+    {
+      "type": "table",
+      "name": "messages_fts",
+      "tbl_name": "messages_fts",
+      "sql": "CREATE VIRTUAL TABLE messages_fts USING fts5(text, content='messages', content_rowid='id')"
+    },
+    {
+      "type": "table",
+      "name": "messages_fts_config",
+      "tbl_name": "messages_fts_config",
+      "sql": "CREATE TABLE 'messages_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "messages_fts_data",
+      "tbl_name": "messages_fts_data",
+      "sql": "CREATE TABLE 'messages_fts_data'(id INTEGER PRIMARY KEY, block BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "messages_fts_docsize",
+      "tbl_name": "messages_fts_docsize",
+      "sql": "CREATE TABLE 'messages_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+    },
+    {
+      "type": "table",
+      "name": "messages_fts_idx",
+      "tbl_name": "messages_fts_idx",
+      "sql": "CREATE TABLE 'messages_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+    },
+    {
+      "type": "index",
+      "name": "messages_session_ts",
+      "tbl_name": "messages",
+      "sql": "CREATE INDEX messages_session_ts ON messages(session_id, ts)"
+    },
+    {
+      "type": "index",
+      "name": "messages_ts",
+      "tbl_name": "messages",
+      "sql": "CREATE INDEX messages_ts ON messages(ts)"
+    },
+    {
+      "type": "table",
+      "name": "meta",
+      "tbl_name": "meta",
+      "sql": "CREATE TABLE meta (\n  key TEXT PRIMARY KEY,\n  value TEXT NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "schema_version",
+      "tbl_name": "schema_version",
+      "sql": "CREATE TABLE schema_version (version INTEGER NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "sends",
+      "tbl_name": "sends",
+      "sql": "CREATE TABLE sends (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  session_id TEXT NOT NULL,\n  profile TEXT NOT NULL,\n  name TEXT NOT NULL,\n  sha256 TEXT NOT NULL,\n  created_at INTEGER NOT NULL,\n  state TEXT NOT NULL,\n  detail TEXT\n)"
+    },
+    {
+      "type": "index",
+      "name": "sends_session_state",
+      "tbl_name": "sends",
+      "sql": "CREATE INDEX sends_session_state ON sends(session_id, state)"
+    },
+    {
+      "type": "table",
+      "name": "sessions",
+      "tbl_name": "sessions",
+      "sql": "CREATE TABLE sessions (\n  session_id TEXT PRIMARY KEY,\n  profile TEXT NOT NULL,\n  name TEXT NOT NULL,\n  cwd TEXT NOT NULL,\n  pid INTEGER NOT NULL,\n  kind TEXT NOT NULL,\n  status TEXT NOT NULL,\n  started_at INTEGER NOT NULL,\n  updated_at INTEGER NOT NULL,\n  ended_at INTEGER,\n  transcript_path TEXT NOT NULL,\n  permission_mode TEXT\n)"
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_latest_reply_1",
+      "tbl_name": "latest_reply",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_messages_1",
+      "tbl_name": "messages",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_meta_1",
+      "tbl_name": "meta",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_sessions_1",
+      "tbl_name": "sessions",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_status_1",
+      "tbl_name": "status",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_tails_1",
+      "tbl_name": "tails",
+      "sql": null
+    },
+    {
+      "type": "table",
+      "name": "sqlite_sequence",
+      "tbl_name": "sqlite_sequence",
+      "sql": "CREATE TABLE sqlite_sequence(name,seq)"
+    },
+    {
+      "type": "table",
+      "name": "status",
+      "tbl_name": "status",
+      "sql": "CREATE TABLE status (\n  session_id TEXT PRIMARY KEY REFERENCES sessions(session_id) ON DELETE CASCADE,\n  progress_pct REAL,\n  phase TEXT,\n  remaining_json TEXT NOT NULL,\n  waiting_json TEXT NOT NULL,\n  recommendations_json TEXT NOT NULL,\n  reply_uuid TEXT NOT NULL,\n  reply_ts TEXT NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "tails",
+      "tbl_name": "tails",
+      "sql": "CREATE TABLE tails (\n  path TEXT PRIMARY KEY,\n  offset INTEGER NOT NULL,\n  size INTEGER NOT NULL,\n  first_uuid TEXT\n)"
+    }
+  ]
+}

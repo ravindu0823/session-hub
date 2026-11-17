@@ -1,0 +1,1954 @@
+[
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw",
+    "input": "{not json",
+    "output": {
+      "kind": "ignored",
+      "reason": "bad-json"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#2",
+    "input": "",
+    "output": {
+      "kind": "ignored",
+      "reason": "bad-json"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#3",
+    "input": "42",
+    "output": {
+      "kind": "ignored",
+      "reason": "bad-json"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#4",
+    "input": "null",
+    "output": {
+      "kind": "ignored",
+      "reason": "bad-json"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#5",
+    "input": "[1]",
+    "output": {
+      "kind": "ignored",
+      "reason": "bad-json"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#6",
+    "input": "\"s\"",
+    "output": {
+      "kind": "ignored",
+      "reason": "bad-json"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:an unrecognised type is never unknown, even with a version, and leaks no text",
+    "input": "{\"type\":\"new-shape\",\"version\":\"2.9.0\",\"text\":\"fixture x\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "unrecognized-type",
+      "type": "new-shape"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:object without a string type is an unrecognised type with empty type",
+    "input": "{}",
+    "output": {
+      "kind": "ignored",
+      "reason": "unrecognized-type",
+      "type": ""
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"AB8 done, check it\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":true}}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "u-q",
+      "ts": "2026-11-14T09:46:16.003Z",
+      "text": "AB8 done, check it"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#2",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":[{\"type\":\"text\",\"text\":\"Q1: yes\"},{\"type\":\"image\"}],\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":true}}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "u-q",
+      "ts": "2026-11-14T09:46:16.003Z",
+      "text": "Q1: yes"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#3",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":true}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#4",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":true}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#5",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"Q1: yes\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"task-notification\"},\"humanTurn\":true}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#6",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"Q1: yes\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":false}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#7",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"Q1: yes\",\"origin\":{\"kind\":\"human\"}}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:a numeric version is not carried on unknown",
+    "input": "{\"type\":\"user\",\"message\":null,\"version\":3}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:sidechain and meta records are ignored before the shape check",
+    "input": "{\"type\":\"user\",\"isSidechain\":true,\"message\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "sidechain"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:sidechain and meta records are ignored before the shape check#2",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "sidechain"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types",
+    "input": "{\"type\":\"user\",\"message\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#2",
+    "input": "{\"type\":\"user\",\"attachment\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#3",
+    "input": "{\"type\":\"user\",\"content\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#4",
+    "input": "{\"type\":\"user\",\"origin\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#5",
+    "input": "{\"type\":\"user\",\"permissionMode\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#6",
+    "input": "{\"type\":\"user\",\"message\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#7",
+    "input": "{\"type\":\"user\",\"attachment\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#8",
+    "input": "{\"type\":\"user\",\"content\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#9",
+    "input": "{\"type\":\"user\",\"origin\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#10",
+    "input": "{\"type\":\"user\",\"permissionMode\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#11",
+    "input": "{\"type\":\"user\",\"message\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#12",
+    "input": "{\"type\":\"user\",\"attachment\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#13",
+    "input": "{\"type\":\"user\",\"content\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#14",
+    "input": "{\"type\":\"user\",\"origin\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#15",
+    "input": "{\"type\":\"user\",\"permissionMode\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#16",
+    "input": "{\"type\":\"user\",\"message\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#17",
+    "input": "{\"type\":\"user\",\"attachment\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#18",
+    "input": "{\"type\":\"user\",\"content\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#19",
+    "input": "{\"type\":\"user\",\"origin\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#20",
+    "input": "{\"type\":\"user\",\"permissionMode\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#21",
+    "input": "{\"type\":\"user\",\"message\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#22",
+    "input": "{\"type\":\"user\",\"attachment\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#23",
+    "input": "{\"type\":\"user\",\"content\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#24",
+    "input": "{\"type\":\"user\",\"origin\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#25",
+    "input": "{\"type\":\"user\",\"permissionMode\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#26",
+    "input": "{\"type\":\"user\",\"message\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#27",
+    "input": "{\"type\":\"user\",\"attachment\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#28",
+    "input": "{\"type\":\"user\",\"content\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#29",
+    "input": "{\"type\":\"user\",\"origin\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#30",
+    "input": "{\"type\":\"user\",\"permissionMode\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#31",
+    "input": "{\"type\":\"assistant\",\"message\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#32",
+    "input": "{\"type\":\"assistant\",\"attachment\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#33",
+    "input": "{\"type\":\"assistant\",\"content\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#34",
+    "input": "{\"type\":\"assistant\",\"origin\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#35",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":null}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#36",
+    "input": "{\"type\":\"assistant\",\"message\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#37",
+    "input": "{\"type\":\"assistant\",\"attachment\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#38",
+    "input": "{\"type\":\"assistant\",\"content\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#39",
+    "input": "{\"type\":\"assistant\",\"origin\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#40",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":42}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#41",
+    "input": "{\"type\":\"assistant\",\"message\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#42",
+    "input": "{\"type\":\"assistant\",\"attachment\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#43",
+    "input": "{\"type\":\"assistant\",\"content\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#44",
+    "input": "{\"type\":\"assistant\",\"origin\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#45",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":\"s\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#46",
+    "input": "{\"type\":\"assistant\",\"message\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#47",
+    "input": "{\"type\":\"assistant\",\"attachment\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#48",
+    "input": "{\"type\":\"assistant\",\"content\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#49",
+    "input": "{\"type\":\"assistant\",\"origin\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#50",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":[]}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#51",
+    "input": "{\"type\":\"assistant\",\"message\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#52",
+    "input": "{\"type\":\"assistant\",\"attachment\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#53",
+    "input": "{\"type\":\"assistant\",\"content\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#54",
+    "input": "{\"type\":\"assistant\",\"origin\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#55",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":{}}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#56",
+    "input": "{\"type\":\"assistant\",\"message\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#57",
+    "input": "{\"type\":\"assistant\",\"attachment\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#58",
+    "input": "{\"type\":\"assistant\",\"content\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#59",
+    "input": "{\"type\":\"assistant\",\"origin\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#60",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":true}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#61",
+    "input": "{\"type\":\"attachment\",\"message\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#62",
+    "input": "{\"type\":\"attachment\",\"attachment\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#63",
+    "input": "{\"type\":\"attachment\",\"content\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#64",
+    "input": "{\"type\":\"attachment\",\"origin\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#65",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#66",
+    "input": "{\"type\":\"attachment\",\"message\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#67",
+    "input": "{\"type\":\"attachment\",\"attachment\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#68",
+    "input": "{\"type\":\"attachment\",\"content\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#69",
+    "input": "{\"type\":\"attachment\",\"origin\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#70",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#71",
+    "input": "{\"type\":\"attachment\",\"message\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#72",
+    "input": "{\"type\":\"attachment\",\"attachment\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#73",
+    "input": "{\"type\":\"attachment\",\"content\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#74",
+    "input": "{\"type\":\"attachment\",\"origin\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#75",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#76",
+    "input": "{\"type\":\"attachment\",\"message\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#77",
+    "input": "{\"type\":\"attachment\",\"attachment\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#78",
+    "input": "{\"type\":\"attachment\",\"content\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#79",
+    "input": "{\"type\":\"attachment\",\"origin\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#80",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#81",
+    "input": "{\"type\":\"attachment\",\"message\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#82",
+    "input": "{\"type\":\"attachment\",\"attachment\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#83",
+    "input": "{\"type\":\"attachment\",\"content\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#84",
+    "input": "{\"type\":\"attachment\",\"origin\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#85",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#86",
+    "input": "{\"type\":\"attachment\",\"message\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#87",
+    "input": "{\"type\":\"attachment\",\"attachment\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#88",
+    "input": "{\"type\":\"attachment\",\"content\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#89",
+    "input": "{\"type\":\"attachment\",\"origin\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#90",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#91",
+    "input": "{\"type\":\"system\",\"message\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#92",
+    "input": "{\"type\":\"system\",\"attachment\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#93",
+    "input": "{\"type\":\"system\",\"content\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#94",
+    "input": "{\"type\":\"system\",\"origin\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#95",
+    "input": "{\"type\":\"system\",\"permissionMode\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#96",
+    "input": "{\"type\":\"system\",\"message\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#97",
+    "input": "{\"type\":\"system\",\"attachment\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#98",
+    "input": "{\"type\":\"system\",\"content\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#99",
+    "input": "{\"type\":\"system\",\"origin\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#100",
+    "input": "{\"type\":\"system\",\"permissionMode\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#101",
+    "input": "{\"type\":\"system\",\"message\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#102",
+    "input": "{\"type\":\"system\",\"attachment\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#103",
+    "input": "{\"type\":\"system\",\"content\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#104",
+    "input": "{\"type\":\"system\",\"origin\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#105",
+    "input": "{\"type\":\"system\",\"permissionMode\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#106",
+    "input": "{\"type\":\"system\",\"message\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#107",
+    "input": "{\"type\":\"system\",\"attachment\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#108",
+    "input": "{\"type\":\"system\",\"content\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#109",
+    "input": "{\"type\":\"system\",\"origin\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#110",
+    "input": "{\"type\":\"system\",\"permissionMode\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#111",
+    "input": "{\"type\":\"system\",\"message\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#112",
+    "input": "{\"type\":\"system\",\"attachment\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#113",
+    "input": "{\"type\":\"system\",\"content\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#114",
+    "input": "{\"type\":\"system\",\"origin\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#115",
+    "input": "{\"type\":\"system\",\"permissionMode\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#116",
+    "input": "{\"type\":\"system\",\"message\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#117",
+    "input": "{\"type\":\"system\",\"attachment\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#118",
+    "input": "{\"type\":\"system\",\"content\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#119",
+    "input": "{\"type\":\"system\",\"origin\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#120",
+    "input": "{\"type\":\"system\",\"permissionMode\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#121",
+    "input": "{\"type\":\"permission-mode\",\"message\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#122",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#123",
+    "input": "{\"type\":\"permission-mode\",\"content\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#124",
+    "input": "{\"type\":\"permission-mode\",\"origin\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#125",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#126",
+    "input": "{\"type\":\"permission-mode\",\"message\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#127",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#128",
+    "input": "{\"type\":\"permission-mode\",\"content\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#129",
+    "input": "{\"type\":\"permission-mode\",\"origin\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#130",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":42}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#131",
+    "input": "{\"type\":\"permission-mode\",\"message\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#132",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#133",
+    "input": "{\"type\":\"permission-mode\",\"content\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#134",
+    "input": "{\"type\":\"permission-mode\",\"origin\":\"s\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#135",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":\"s\"}",
+    "output": {
+      "kind": "permission-mode",
+      "ts": "",
+      "mode": "s"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#136",
+    "input": "{\"type\":\"permission-mode\",\"message\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#137",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#138",
+    "input": "{\"type\":\"permission-mode\",\"content\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#139",
+    "input": "{\"type\":\"permission-mode\",\"origin\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#140",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#141",
+    "input": "{\"type\":\"permission-mode\",\"message\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#142",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#143",
+    "input": "{\"type\":\"permission-mode\",\"content\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#144",
+    "input": "{\"type\":\"permission-mode\",\"origin\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#145",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":{}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#146",
+    "input": "{\"type\":\"permission-mode\",\"message\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#147",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#148",
+    "input": "{\"type\":\"permission-mode\",\"content\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#149",
+    "input": "{\"type\":\"permission-mode\",\"origin\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#150",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":true}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "focus:1",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":\"plan\"}\r",
+    "output": {
+      "kind": "permission-mode",
+      "ts": "",
+      "mode": "plan"
+    }
+  },
+  {
+    "name": "focus:2",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"crlf\"},\"uuid\":\"c-1\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"},\"cwd\":\"C:\\\\Program Files\\\\x\"}\r",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "c-1",
+      "ts": "t",
+      "text": "crlf"
+    }
+  },
+  {
+    "name": "focus:3",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"cwd\"},\"uuid\":\"c-2\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"},\"cwd\":\"C:\\\\Program Files\\\\x\"}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "c-2",
+      "ts": "t",
+      "text": "cwd"
+    }
+  },
+  {
+    "name": "focus:4",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀xxxxx\"}]},\"uuid\":\"a-9\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "assistant-text",
+      "uuid": "a-9",
+      "ts": "t",
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀xxxxx"
+    }
+  },
+  {
+    "name": "focus:5",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"﻿<local-command-stdout>x</local-command-stdout>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "local-command-output"
+    }
+  },
+  {
+    "name": "focus:6",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\" <local-command-stderr>x</local-command-stderr>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "local-command-output"
+    }
+  },
+  {
+    "name": "focus:7",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"<local-command-stdout>x</local-command-stdout>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "u-lc",
+      "ts": "t",
+      "text": "<local-command-stdout>x</local-command-stdout>"
+    }
+  },
+  {
+    "name": "focus:8",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"\\n  <local-command-stderr>x</local-command-stderr>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "local-command-output"
+    }
+  },
+  {
+    "name": "focus:9",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"see <local-command-stdout>x</local-command-stdout>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "u-lc",
+      "ts": "t",
+      "text": "see <local-command-stdout>x</local-command-stdout>"
+    }
+  },
+  {
+    "name": "fixture:assistant.jsonl:1",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":false,\"uuid\":\"a-1\",\"timestamp\":\"2026-11-13T08:27:00.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"fixture secret thought\"},{\"type\":\"text\",\"text\":\"first part\"},{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"Bash\",\"input\":{}},{\"type\":\"text\",\"text\":\"second part\"}]}}",
+    "output": {
+      "kind": "assistant-text",
+      "uuid": "a-1",
+      "ts": "2026-11-13T08:27:00.000Z",
+      "text": "first part\nsecond part"
+    }
+  },
+  {
+    "name": "fixture:assistant.jsonl:2",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":false,\"uuid\":\"a-2\",\"timestamp\":\"2026-11-13T08:27:01.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"only thought\"},{\"type\":\"tool_use\",\"id\":\"t2\",\"name\":\"Bash\",\"input\":{}}]}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "empty"
+    }
+  },
+  {
+    "name": "fixture:assistant.jsonl:3",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":true,\"uuid\":\"a-3\",\"timestamp\":\"2026-11-13T08:27:02.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"sidechain text\"}]}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "sidechain"
+    }
+  },
+  {
+    "name": "fixture:held.jsonl:1",
+    "input": "{\"parentUuid\":\"p3\",\"isSidechain\":false,\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"Held peer message — from an unidentified session (peer claims name: scratchpad-03); preview: «fixture» [1 line] — not delivered to Claude (1 held).\",\"isMeta\":false,\"timestamp\":\"2026-11-13T08:28:00.000Z\",\"uuid\":\"h-1\",\"level\":\"warning\"}",
+    "output": {
+      "kind": "held-notice",
+      "uuid": "h-1",
+      "ts": "2026-11-13T08:28:00.000Z",
+      "peerName": "scratchpad-03"
+    }
+  },
+  {
+    "name": "fixture:held.jsonl:2",
+    "input": "{\"isSidechain\":false,\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"Held peer message — from an unidentified session; preview: «fixture»\",\"timestamp\":\"2026-11-13T08:28:01.000Z\",\"uuid\":\"h-2\"}",
+    "output": {
+      "kind": "held-notice",
+      "uuid": "h-2",
+      "ts": "2026-11-13T08:28:01.000Z",
+      "peerName": ""
+    }
+  },
+  {
+    "name": "fixture:held.jsonl:3",
+    "input": "{\"isSidechain\":false,\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"Some other notice\",\"timestamp\":\"2026-11-13T08:28:02.000Z\",\"uuid\":\"h-3\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "system"
+    }
+  },
+  {
+    "name": "fixture:mode.jsonl:1",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":\"bypassPermissions\",\"sessionId\":\"s-1\"}",
+    "output": {
+      "kind": "permission-mode",
+      "ts": "",
+      "mode": "bypassPermissions"
+    }
+  },
+  {
+    "name": "fixture:never-store.jsonl:1",
+    "input": "{\"type\":\"api-request\",\"uuid\":\"n-1\",\"timestamp\":\"2026-11-13T08:29:00.000Z\",\"content\":\"fixture request text\",\"message\":{\"content\":\"fixture request text\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "never-store"
+    }
+  },
+  {
+    "name": "fixture:never-store.jsonl:2",
+    "input": "{\"type\":\"api-request-blob\",\"uuid\":\"n-2\",\"blob\":\"fixture blob text\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "never-store"
+    }
+  },
+  {
+    "name": "fixture:never-store.jsonl:3",
+    "input": "{\"type\":\"api-request-shape\",\"uuid\":\"n-3\",\"shape\":\"fixture shape text\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "never-store"
+    }
+  },
+  {
+    "name": "fixture:never-store.jsonl:4",
+    "input": "{\"type\":\"file-history-snapshot\",\"messageId\":\"n-4\",\"snapshot\":{\"x\":\"fixture snapshot text\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "never-store"
+    }
+  },
+  {
+    "name": "fixture:never-store.jsonl:5",
+    "input": "{\"type\":\"file-history-delta\",\"messageId\":\"n-5\",\"delta\":\"fixture delta text\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "never-store"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:1",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":null,\"uuid\":\"o-1\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:2",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":\"str\",\"uuid\":\"o-2\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:3",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":{\"role\":\"assistant\",\"content\":42},\"uuid\":\"o-3\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:4",
+    "input": "{\"type\":\"attachment\",\"isSidechain\":false,\"uuid\":\"o-4\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:5",
+    "input": "{\"type\":\"attachment\",\"isSidechain\":false,\"uuid\":\"o-5\",\"timestamp\":\"t\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"fixture x\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:6",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"fixture mixed\"},{\"type\":\"tool_result\",\"tool_use_id\":\"t\",\"content\":\"x\"}]},\"uuid\":\"o-6\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "tool-result"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:7",
+    "input": "{\"type\":42,\"uuid\":\"o-7\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "unrecognized-type",
+      "type": ""
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:8",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"uuid\":\"o-8\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:9",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":{\"role\":\"assistant\"},\"uuid\":\"o-9\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:10",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":null},\"uuid\":\"o-10\",\"timestamp\":\"t\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "user"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:11",
+    "input": "{\"type\":\"attachment\",\"isSidechain\":false,\"uuid\":\"o-11\",\"timestamp\":\"t\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"fixture x\",\"origin\":\"fixture peer\"}}",
+    "output": {
+      "kind": "unknown",
+      "type": "attachment"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:12",
+    "input": "{\"type\":\"attachment\",\"isSidechain\":false,\"uuid\":\"o-12\",\"timestamp\":\"t\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"fixture x\",\"origin\":null}}",
+    "output": {
+      "kind": "unknown",
+      "type": "attachment"
+    }
+  },
+  {
+    "name": "fixture:odd.jsonl:13",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":[],\"uuid\":\"o-13\",\"timestamp\":\"t\",\"version\":\"2.9.0\"}",
+    "output": {
+      "kind": "unknown",
+      "type": "assistant",
+      "version": "2.9.0"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:1",
+    "input": "{\"type\":\"queue-operation\",\"operation\":\"enqueue\",\"content\":\"fixture q\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:2",
+    "input": "{\"type\":\"last-prompt\",\"lastPrompt\":\"fixture lp\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:3",
+    "input": "{\"type\":\"mode\",\"mode\":\"x\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:4",
+    "input": "{\"type\":\"ai-title\",\"aiTitle\":\"fixture title\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:5",
+    "input": "{\"type\":\"tools-used\",\"tools\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:6",
+    "input": "{\"type\":\"atis-latch\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:7",
+    "input": "{\"type\":\"session-owner\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:8",
+    "input": "{\"type\":\"pr-link\",\"url\":\"fixture link\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:9",
+    "input": "{\"type\":\"frame-link\",\"url\":\"fixture frame\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:10",
+    "input": "{\"type\":\"cost-state\",\"costUsd\":1}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:11",
+    "input": "{\"type\":\"artifact-autoreact-ledger\",\"entries\":[]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:12",
+    "input": "{\"type\":\"artifact-comment-monitor\",\"state\":\"fixture x\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:other.jsonl:13",
+    "input": "{\"type\":\"brand-new-type\",\"uuid\":\"x\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "unrecognized-type",
+      "type": "brand-new-type"
+    }
+  },
+  {
+    "name": "fixture:peer-idle.jsonl:1",
+    "input": "{\"parentUuid\":null,\"isSidechain\":false,\"type\":\"user\",\"isMeta\":true,\"origin\":{\"kind\":\"peer\",\"from\":\"uds:\\\\\\\\.\\\\pipe\\\\LOCAL\\\\cc-msg-fixture\",\"msg_id\":\"m-9\"},\"message\":{\"role\":\"user\",\"content\":\"Another Claude session sent a message:\\n<cross-session-message from=\\\"uds:\\\\\\\\.\\\\pipe\\\\LOCAL\\\\cc-msg-fixture\\\" from-name=\\\"session-hub-relay\\\" from-mode=\\\"bypass\\\">\\n[Session Hub: fixture header]\\n\\nfixture idle body\\nsecond line\\n</cross-session-message>\\n\\nfixture trailing hint\"},\"uuid\":\"pi-1\",\"timestamp\":\"2026-11-13T10:55:01.000Z\"}",
+    "output": {
+      "kind": "peer-message",
+      "uuid": "pi-1",
+      "ts": "2026-11-13T10:55:01.000Z",
+      "fromName": "session-hub-relay",
+      "fromMode": "bypass",
+      "body": "[Session Hub: fixture header]\n\nfixture idle body\nsecond line"
+    }
+  },
+  {
+    "name": "fixture:peer-idle.jsonl:2",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"isMeta\":true,\"origin\":{\"kind\":\"peer\",\"from\":\"uds:\\\\\\\\.\\\\pipe\\\\LOCAL\\\\cc-msg-fixture\",\"msg_id\":\"m-9\"},\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Another Claude session sent a message:\\n<cross-session-message from=\\\"uds:x\\\" from-name=\\\"fixture-peer\\\" from-mode=\\\"default\\\">\"},{\"type\":\"text\",\"text\":\"fixture block body\\n</cross-session-message>\"}]},\"uuid\":\"pi-2\",\"timestamp\":\"2026-11-13T10:55:02.000Z\"}",
+    "output": {
+      "kind": "peer-message",
+      "uuid": "pi-2",
+      "ts": "2026-11-13T10:55:02.000Z",
+      "fromName": "fixture-peer",
+      "fromMode": "default",
+      "body": "fixture block body"
+    }
+  },
+  {
+    "name": "fixture:peer-idle.jsonl:3",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"isMeta\":true,\"origin\":{\"kind\":\"peer\",\"from\":\"uds:\\\\\\\\.\\\\pipe\\\\LOCAL\\\\cc-msg-fixture\",\"msg_id\":\"m-9\"},\"message\":{\"role\":\"user\",\"content\":\"fixture unwrapped peer text\"},\"uuid\":\"pi-3\",\"timestamp\":\"2026-11-13T10:55:03.000Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "peer-unwrapped"
+    }
+  },
+  {
+    "name": "fixture:peer-idle.jsonl:4",
+    "input": "{\"isSidechain\":true,\"type\":\"user\",\"isMeta\":true,\"origin\":{\"kind\":\"peer\",\"from\":\"uds:\\\\\\\\.\\\\pipe\\\\LOCAL\\\\cc-msg-fixture\",\"msg_id\":\"m-9\"},\"message\":{\"role\":\"user\",\"content\":\"Another Claude session sent a message:\\n<cross-session-message from=\\\"uds:\\\\\\\\.\\\\pipe\\\\LOCAL\\\\cc-msg-fixture\\\" from-name=\\\"session-hub-relay\\\" from-mode=\\\"bypass\\\">\\n[Session Hub: fixture header]\\n\\nfixture idle body\\nsecond line\\n</cross-session-message>\\n\\nfixture trailing hint\"},\"uuid\":\"pi-4\",\"timestamp\":\"2026-11-13T10:55:04.000Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "sidechain"
+    }
+  },
+  {
+    "name": "fixture:peer-idle.jsonl:5",
+    "input": "{\"type\":\"queue-operation\",\"operation\":\"enqueue\",\"content\":\"fixture queue text\",\"timestamp\":\"2026-11-13T10:55:00.500Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "not-needed"
+    }
+  },
+  {
+    "name": "fixture:peer.jsonl:1",
+    "input": "{\"parentUuid\":\"p2\",\"isSidechain\":false,\"type\":\"attachment\",\"uuid\":\"at-1\",\"timestamp\":\"2026-11-13T08:27:08.617Z\",\"isMeta\":true,\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"<cross-session-message>fixture wrapped</cross-session-message>\",\"source_uuid\":\"su-1\",\"delivery_id\":\"d-1\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"peer\",\"from\":\"uds:\\\\\\\\.\\\\pipe\\\\LOCAL\\\\cc-msg-fixture\",\"msg_id\":\"m-1\",\"name\":\"session-hub-relay\",\"fromMode\":\"bypass\",\"body\":\"fixture peer body\",\"verifiedLocal\":true}}}",
+    "output": {
+      "kind": "peer-message",
+      "uuid": "at-1",
+      "ts": "2026-11-13T08:27:08.617Z",
+      "fromName": "session-hub-relay",
+      "fromMode": "bypass",
+      "body": "fixture peer body"
+    }
+  },
+  {
+    "name": "fixture:peer.jsonl:2",
+    "input": "{\"isSidechain\":false,\"type\":\"attachment\",\"uuid\":\"at-2\",\"timestamp\":\"2026-11-13T08:27:09.000Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"x\",\"origin\":{\"kind\":\"human\"}}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "fixture:peer.jsonl:3",
+    "input": "{\"isSidechain\":false,\"type\":\"attachment\",\"uuid\":\"at-3\",\"timestamp\":\"2026-11-13T08:27:10.000Z\",\"attachment\":{\"type\":\"file\",\"content\":\"fixture file body\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "attachment"
+    }
+  },
+  {
+    "name": "fixture:user-ignored.jsonl:1",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"fixture tool output\"}]},\"uuid\":\"u-3\",\"timestamp\":\"2026-11-13T08:26:30.000Z\",\"sourceToolAssistantUUID\":\"a-1\",\"toolUseResult\":{\"stdout\":\"x\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "tool-result"
+    }
+  },
+  {
+    "name": "fixture:user-ignored.jsonl:2",
+    "input": "{\"isSidechain\":false,\"isMeta\":true,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"fixture meta text\"},\"uuid\":\"u-4\",\"timestamp\":\"2026-11-13T08:26:31.000Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "meta"
+    }
+  },
+  {
+    "name": "fixture:user-ignored.jsonl:3",
+    "input": "{\"isSidechain\":true,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"fixture sidechain text\"},\"uuid\":\"u-5\",\"timestamp\":\"2026-11-13T08:26:32.000Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "sidechain"
+    }
+  },
+  {
+    "name": "fixture:user-ignored.jsonl:4",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"fixture non human\"},\"uuid\":\"u-6\",\"timestamp\":\"2026-11-13T08:26:33.000Z\",\"origin\":{\"kind\":\"task-notification\"}}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "fixture:user-ignored.jsonl:5",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"fixture string origin\"},\"uuid\":\"u-7\",\"timestamp\":\"2026-11-13T08:26:34.000Z\",\"origin\":\"human\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "fixture:user-ignored.jsonl:6",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"fixture null origin\"},\"uuid\":\"u-8\",\"timestamp\":\"2026-11-13T08:26:35.000Z\",\"origin\":null}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "fixture:user-ignored.jsonl:7",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"fixture array origin\"},\"uuid\":\"u-9\",\"timestamp\":\"2026-11-13T08:26:36.000Z\",\"origin\":[{\"kind\":\"human\"}]}",
+    "output": {
+      "kind": "ignored",
+      "reason": "non-human-origin"
+    }
+  },
+  {
+    "name": "fixture:user-system.jsonl:1",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"This session is being continued from a previous conversation. fixture summary naming Q7: yes\"},\"isCompactSummary\":true,\"isVisibleInTranscriptOnly\":true,\"userType\":\"external\",\"uuid\":\"s-1\",\"timestamp\":\"2026-11-15T08:59:40.000Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "compact-summary"
+    }
+  },
+  {
+    "name": "fixture:user-system.jsonl:2",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"<local-command-stdout>fixture compacted Q7: yes</local-command-stdout>\"},\"userType\":\"external\",\"uuid\":\"s-2\",\"timestamp\":\"2026-11-15T08:59:41.000Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "local-command-output"
+    }
+  },
+  {
+    "name": "fixture:user-system.jsonl:3",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"<local-command-stdout>fixture array output</local-command-stdout>\"}]},\"userType\":\"external\",\"uuid\":\"s-3\",\"timestamp\":\"2026-11-15T08:59:42.000Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "local-command-output"
+    }
+  },
+  {
+    "name": "fixture:user-system.jsonl:4",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"<local-command-stderr>fixture error output</local-command-stderr>\"},\"userType\":\"external\",\"uuid\":\"s-4\",\"timestamp\":\"2026-11-15T08:59:43.000Z\"}",
+    "output": {
+      "kind": "ignored",
+      "reason": "local-command-output"
+    }
+  },
+  {
+    "name": "fixture:user-system.jsonl:5",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"<command-name>/compact</command-name>\\n            <command-message>compact</command-message>\\n            <command-args></command-args>\"},\"userType\":\"external\",\"uuid\":\"s-5\",\"timestamp\":\"2026-11-15T08:59:44.000Z\"}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "s-5",
+      "ts": "2026-11-15T08:59:44.000Z",
+      "text": "<command-name>/compact</command-name>\n            <command-message>compact</command-message>\n            <command-args></command-args>"
+    }
+  },
+  {
+    "name": "fixture:user-system.jsonl:6",
+    "input": "{\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"Q7 yes, and see <local-command-stdout> above\"},\"userType\":\"external\",\"uuid\":\"s-6\",\"timestamp\":\"2026-11-15T08:59:45.000Z\"}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "s-6",
+      "ts": "2026-11-15T08:59:45.000Z",
+      "text": "Q7 yes, and see <local-command-stdout> above"
+    }
+  },
+  {
+    "name": "fixture:user-typed.jsonl:1",
+    "input": "{\"parentUuid\":\"p1\",\"isSidechain\":false,\"promptId\":\"pr1\",\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"fixture owner prompt\"},\"uuid\":\"u-1\",\"timestamp\":\"2026-11-13T08:26:28.698Z\",\"permissionMode\":\"bypassPermissions\",\"origin\":{\"kind\":\"human\"},\"promptSource\":\"typed\",\"userType\":\"external\",\"cwd\":\"C:\\\\fixture\",\"sessionId\":\"s-1\",\"version\":\"2.1.323\"}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "u-1",
+      "ts": "2026-11-13T08:26:28.698Z",
+      "text": "fixture owner prompt"
+    }
+  },
+  {
+    "name": "fixture:user-typed.jsonl:2",
+    "input": "{\"parentUuid\":\"p1\",\"isSidechain\":false,\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"block one\"},{\"type\":\"text\",\"text\":\"block two\"}]},\"uuid\":\"u-2\",\"timestamp\":\"2026-11-13T08:26:29.000Z\",\"userType\":\"external\",\"sessionId\":\"s-1\"}",
+    "output": {
+      "kind": "owner-prompt",
+      "uuid": "u-2",
+      "ts": "2026-11-13T08:26:29.000Z",
+      "text": "block one\nblock two"
+    }
+  }
+]

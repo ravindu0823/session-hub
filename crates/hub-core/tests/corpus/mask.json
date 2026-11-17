@@ -1,0 +1,490 @@
+[
+  {
+    "name": "security/mask-more.test.ts:provider tokens on their own",
+    "input": "bot 123456789:AAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx end"
+  },
+  {
+    "name": "security/mask-more.test.ts:provider tokens on their own#2",
+    "input": "key sk\u005flive_a1a1a1a1a1a1a1a1a1a1a1a1 end"
+  },
+  {
+    "name": "security/mask-more.test.ts:provider tokens on their own#3",
+    "input": "key AIzabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb end"
+  },
+  {
+    "name": "security/mask-more.test.ts:provider tokens on their own#4",
+    "input": "key SG.cccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddd end"
+  },
+  {
+    "name": "security/mask-more.test.ts:provider tokens on their own#5",
+    "input": "key npm_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee end"
+  },
+  {
+    "name": "security/mask-more.test.ts:provider tokens on their own#6",
+    "input": "key glpat-ffffffffffffffffffff end"
+  },
+  {
+    "name": "security/mask-more.test.ts:key names ending in secret/signing/hmac/private/encryption key",
+    "input": "STRIPE_SECRET_KEY=Zq9wXy7Vt3Lm"
+  },
+  {
+    "name": "security/mask-more.test.ts:key names ending in secret/signing/hmac/private/encryption key#2",
+    "input": "HMAC_KEY=Zq9wXy7Vt3Lm"
+  },
+  {
+    "name": "security/mask-more.test.ts:key names ending in secret/signing/hmac/private/encryption key#3",
+    "input": "\"SigningKey\": \"Zq9wXy7Vt3Lm\""
+  },
+  {
+    "name": "security/mask-more.test.ts:key names ending in secret/signing/hmac/private/encryption key#4",
+    "input": "private_key: Zq9wXy7Vt3Lm"
+  },
+  {
+    "name": "security/mask-more.test.ts:key names ending in secret/signing/hmac/private/encryption key#5",
+    "input": "jwtSigningKey=Zq9wXy7Vt3Lm"
+  },
+  {
+    "name": "security/mask-more.test.ts:key names ending in secret/signing/hmac/private/encryption key#6",
+    "input": "ENCRYPTION_KEY=Zq9wXy7Vt3Lm"
+  },
+  {
+    "name": "security/mask-more.test.ts:bare Bearer tokens, webhook URLs, Hugging Face and Vault tokens",
+    "input": "curl -H Bearer Ab3dEf5hIj7lMn9pQr1tUv3xYzx end"
+  },
+  {
+    "name": "security/mask-more.test.ts:bare Bearer tokens, webhook URLs, Hugging Face and Vault tokens#2",
+    "input": "hook https://hooks.slack.com/services/T00000000/B11111111/Ab3dEf5hIj7lMn9pQr1tUv3xYz end"
+  },
+  {
+    "name": "security/mask-more.test.ts:bare Bearer tokens, webhook URLs, Hugging Face and Vault tokens#3",
+    "input": "hook https://discord.com/api/webhooks/123456789012345678/Ab3dEf5hIj7lMn9pQr1tUv3xYzAb3dEf5hIj7lMn9pQr1tUv3xYz end"
+  },
+  {
+    "name": "security/mask-more.test.ts:bare Bearer tokens, webhook URLs, Hugging Face and Vault tokens#4",
+    "input": "t hf_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa end"
+  },
+  {
+    "name": "security/mask-more.test.ts:bare Bearer tokens, webhook URLs, Hugging Face and Vault tokens#5",
+    "input": "t hvs.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb end"
+  },
+  {
+    "name": "security/mask-more.test.ts:bare Bearer tokens, webhook URLs, Hugging Face and Vault tokens#6",
+    "input": "use a Bearer token here"
+  },
+  {
+    "name": "security/mask-more.test.ts:bare Bearer tokens, webhook URLs, Hugging Face and Vault tokens#7",
+    "input": "the hf_ prefix"
+  },
+  {
+    "name": "security/mask-more.test.ts:bare Bearer tokens, webhook URLs, Hugging Face and Vault tokens#8",
+    "input": "Bearer auth"
+  },
+  {
+    "name": "security/mask-more.test.ts:ordinary words with key stay visible",
+    "input": "the primary key: id"
+  },
+  {
+    "name": "security/mask-more.test.ts:ordinary words with key stay visible#2",
+    "input": "monkey=banana123"
+  },
+  {
+    "name": "security/mask-more.test.ts:ordinary words with key stay visible#3",
+    "input": "keyboard: qwerty12"
+  },
+  {
+    "name": "security/mask-more.test.ts:ordinary words with key stay visible#4",
+    "input": "max_tokens: 4096"
+  },
+  {
+    "name": "security/mask-more.test.ts:card numbers that pass the Luhn check, with or without separators",
+    "input": "card 4111111111111111 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:card numbers that pass the Luhn check, with or without separators#2",
+    "input": "card 4111 1111 1111 1111 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:card numbers that pass the Luhn check, with or without separators#3",
+    "input": "card 5555-5555-5555-4444 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:card numbers that pass the Luhn check, with or without separators#4",
+    "input": "amex 378282246310005."
+  },
+  {
+    "name": "security/mask-more.test.ts:a card followed by its expiry or CVV after a space is still masked",
+    "input": "card 4111 1111 1111 1111 12/27"
+  },
+  {
+    "name": "security/mask-more.test.ts:a card followed by its expiry or CVV after a space is still masked#2",
+    "input": "card 4111111111111111 123"
+  },
+  {
+    "name": "security/mask-more.test.ts:a card followed by its expiry or CVV after a space is still masked#3",
+    "input": "card 5555-5555-5555-4444 01 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:a card after a CVV, an expiry or a short number is still masked",
+    "input": "cvv 123 4111111111111111"
+  },
+  {
+    "name": "security/mask-more.test.ts:a card after a CVV, an expiry or a short number is still masked#2",
+    "input": "12/27 4111 1111 1111 1111"
+  },
+  {
+    "name": "security/mask-more.test.ts:a card after a CVV, an expiry or a short number is still masked#3",
+    "input": "#1 4111 1111 1111 1111"
+  },
+  {
+    "name": "security/mask-more.test.ts:a card after a CVV, an expiry or a short number is still masked#4",
+    "input": "exp 12 4111111111111111 cvv 123"
+  },
+  {
+    "name": "security/mask-more.test.ts:a card after a CVV, an expiry or a short number is still masked#5",
+    "input": "ref 9 4111 1111 1111 1111 x"
+  },
+  {
+    "name": "security/mask-more.test.ts:a card after a CVV, an expiry or a short number is still masked#6",
+    "input": "ref 9 3782 822463 10005 x"
+  },
+  {
+    "name": "security/mask-more.test.ts:a list of short numbers is not searched for a card inside it",
+    "input": "scores 12 41 11 11 11 11 11 11 11"
+  },
+  {
+    "name": "security/mask-more.test.ts:amounts and ids that pass Luhn but are not card-shaped stay visible",
+    "input": "id 250000000000000001 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:amounts and ids that pass Luhn but are not card-shaped stay visible#2",
+    "input": "id 20000000000000008 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:amounts and ids that pass Luhn but are not card-shaped stay visible#3",
+    "input": "id 312345678901234 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:amounts and ids that pass Luhn but are not card-shaped stay visible#4",
+    "input": "id 5999999999999993 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:amounts and ids that pass Luhn but are not card-shaped stay visible#5",
+    "input": "id 6123456789012344 ok"
+  },
+  {
+    "name": "security/mask-more.test.ts:digit runs that are not cards stay visible",
+    "input": "epoch 1731500000000 ms"
+  },
+  {
+    "name": "security/mask-more.test.ts:digit runs that are not cards stay visible#2",
+    "input": "id 4111111111111112"
+  },
+  {
+    "name": "security/mask-more.test.ts:digit runs that are not cards stay visible#3",
+    "input": "order 9111111111111111"
+  },
+  {
+    "name": "security/mask-more.test.ts:digit runs that are not cards stay visible#4",
+    "input": "version 1.2.3.4"
+  },
+  {
+    "name": "security/mask-more.test.ts:digit runs that are not cards stay visible#5",
+    "input": "1234 5678"
+  },
+  {
+    "name": "security/mask-more.test.ts:IBANs that pass the mod-97 check",
+    "input": "pay GB82WEST12345698765432 now"
+  },
+  {
+    "name": "security/mask-more.test.ts:IBANs that pass the mod-97 check#2",
+    "input": "pay GB82 WEST 1234 5698 7654 32 now"
+  },
+  {
+    "name": "security/mask-more.test.ts:IBANs that pass the mod-97 check#3",
+    "input": "DE89370400440532013000"
+  },
+  {
+    "name": "security/mask-more.test.ts:IBAN-shaped text that fails mod-97 stays visible",
+    "input": "GB82WEST12345698765433"
+  },
+  {
+    "name": "security/mask-more.test.ts:IBAN-shaped text that fails mod-97 stays visible#2",
+    "input": "AB12CDEF"
+  },
+  {
+    "name": "security/mask-more.test.ts:idempotent",
+    "input": "bot 123456789:AAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx card 4111111111111111 iban GB82WEST12345698765432 HMAC_KEY=Zq9wXy7Vt3Lm"
+  },
+  {
+    "name": "security/mask-more.test.ts:idempotent#2",
+    "input": "bot [masked:telegram] card [masked:card] iban [masked:iban] HMAC_KEY=[masked:password-kv]"
+  },
+  {
+    "name": "security/mask.test.ts:github",
+    "input": "token here: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx end\n"
+  },
+  {
+    "name": "security/mask.test.ts:jwt",
+    "input": "jwt eyJhbGciOi.eyJzdWIi.c2lnbmF0dXJl end\n"
+  },
+  {
+    "name": "security/mask.test.ts:anthropic labelled before openai",
+    "input": "key sk-ant-yyyyyyyyyyyyyyyyyyyyyyyy end\n"
+  },
+  {
+    "name": "security/mask.test.ts:openai",
+    "input": "key sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx end\n"
+  },
+  {
+    "name": "security/mask.test.ts:aws",
+    "input": "id AKIAXXXXXXXXXXXXXXXX end\n"
+  },
+  {
+    "name": "security/mask.test.ts:azure-conn keeps key name",
+    "input": "DefaultEndpointsProtocol=https;AccountName=fake;AccountKey=ZmFrZWtleQ==;EndpointSuffix=x\nsas SharedAccessSignature=sv=fake&sig=fake end\n"
+  },
+  {
+    "name": "security/mask.test.ts:password-kv keeps key name",
+    "input": "login password=hunter22x ok\nconfig Secret: abcdefgh\n"
+  },
+  {
+    "name": "security/mask.test.ts:private-key whole block",
+    "input": "a\n-----BEGIN RSA PRIVATE KEY-----\nZmFrZQ==\nZmFrZTI=\n-----END RSA PRIVATE KEY-----\nb\n"
+  },
+  {
+    "name": "security/mask.test.ts:conn-string masks only password",
+    "input": "cs Server=db1;Database=app;User Id=u;Password=fakepass1;Encrypt=true\n"
+  },
+  {
+    "name": "security/mask.test.ts:safe text untouched",
+    "input": "Q15 SH10 see C:\\Users\\x\\a.txt and /home/x/a.txt sha a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1 git b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2 id 123e4567-e89b-12d3-a456-426614174000\nkv-request:v1:eyJrZXkiOiJmYWtlIn0 kv-share:v1:eyJ0eXAiOiJmYWtlIn0 the password and token words only.\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture",
+    "input": "token here: [masked:github] end\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture#2",
+    "input": "jwt [masked:jwt] end\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture#3",
+    "input": "key [masked:anthropic] end\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture#4",
+    "input": "key [masked:openai] end\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture#5",
+    "input": "id [masked:aws] end\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture#6",
+    "input": "DefaultEndpointsProtocol=https;AccountName=fake;AccountKey=[masked:azure-conn];EndpointSuffix=x\nsas SharedAccessSignature=[masked:azure-conn] end\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture#7",
+    "input": "login password=[masked:password-kv] ok\nconfig Secret: [masked:password-kv]\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture#8",
+    "input": "a\n[masked:private-key]\nb\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over every fixture#9",
+    "input": "cs Server=db1;Database=app;User Id=u;Password=[masked:conn-string];Encrypt=true\n"
+  },
+  {
+    "name": "security/mask.test.ts:kv forms: json, quoted, env, pwd path stays",
+    "input": "{\"password\": \"hunter22xyz\"}\n\"client_secret\":\"abcdefghijkl\"\npassword=\"abc def ghi\"\npassword = \"Sup3r S3cret!\"\nAWS_SECRET_ACCESS_KEY=fakefakefakefake\nAPI_KEY=fakefakefakefake\npwd: /home/user/project/src\npwd: C:\\Users\\x\\proj\n"
+  },
+  {
+    "name": "security/mask.test.ts:headers keep name, mask value",
+    "input": "Authorization: Bearer fakebearervalue\nauthorization: Basic ZmFrZTpmYWtl\nX-Api-Key: fakeapikey123\nOcp-Apim-Subscription-Key: fakesubkey\nAuthorization: token ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
+  },
+  {
+    "name": "security/mask.test.ts:url credentials, sas sig, SharedAccessKey",
+    "input": "postgres://app:fakepw12@db:5432/x\nmongodb+srv://u:fakepw12@c.example/db\nredis://:fakepw12@h:6379\namqp://g:fakepw12@h\nhttps://x.example/blob?sv=1&sig=fakesigvalue%3D&se=2\nEndpoint=sb://x;SharedAccessKey=ZmFrZQ==\n"
+  },
+  {
+    "name": "security/mask.test.ts:new provider forms and aws right boundary",
+    "input": "sk-proj-yyyyyyyyyyyyyyyyyyyyyyyy\ngithub_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxoxb-fakefakefake\nAKIAXXXXXXXXXXXXXXXXY\n"
+  },
+  {
+    "name": "security/mask.test.ts:repros are stable and keep inner labels; conn-string is case-insensitive",
+    "input": "Server=a;Password=p1x;Server=b;Password=p2y\ntoken: \"eyJhbGciOi.eyJzdWIi.c2lnbmF0dXJl\"\nserver=db1;pwd=fakepass1;x=y\n"
+  },
+  {
+    "name": "security/mask.test.ts:repros are stable and keep inner labels; conn-string is case-insensitive#2",
+    "input": "Server=a;Password=[masked:conn-string];Server=b;Password=[masked:conn-string]\ntoken: \"[masked:jwt]\"\nserver=db1;pwd=[masked:conn-string];x=y\n"
+  },
+  {
+    "name": "security/mask.test.ts:private key with CRLF and truncated key",
+    "input": "-----BEGIN PRIVATE KEY-----\r\nZmFrZQ==\r\nZmFrZTI=\r\n-----END PRIVATE KEY-----\r\nafter\r\n"
+  },
+  {
+    "name": "security/mask.test.ts:private key with CRLF and truncated key#2",
+    "input": "before\n-----BEGIN PRIVATE KEY-----\nZmFrZQ==\nZmFrZTI=\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over the new fixtures",
+    "input": "{\"password\": [masked:password-kv]}\n\"client_secret\":[masked:password-kv]\npassword=[masked:password-kv]\npassword = [masked:password-kv]\nAWS_SECRET_ACCESS_KEY=[masked:password-kv]\nAPI_KEY=[masked:password-kv]\npwd: /home/user/project/src\npwd: C:\\Users\\x\\proj\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over the new fixtures#2",
+    "input": "Authorization: Bearer [masked:auth-header]\nauthorization: Basic [masked:auth-header]\nX-Api-Key: [masked:api-key-header]\nOcp-Apim-Subscription-Key: [masked:api-key-header]\nAuthorization: token [masked:github]\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over the new fixtures#3",
+    "input": "postgres://app:[masked:url-cred]@db:5432/x\nmongodb+srv://u:[masked:url-cred]@c.example/db\nredis://:[masked:url-cred]@h:6379\namqp://g:[masked:url-cred]@h\nhttps://x.example/blob?sv=1&sig=[masked:sas-sig]&se=2\nEndpoint=sb://x;SharedAccessKey=[masked:azure-conn]\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over the new fixtures#4",
+    "input": "[masked:openai]\n[masked:github]\n[masked:slack]\nAKIAXXXXXXXXXXXXXXXXY\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over the new fixtures#5",
+    "input": "-----BEGIN PRIVATE KEY-----\nZmFrZQ==\nZmFrZTI=\n-----END PRIVATE KEY-----\nafter\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over the new fixtures#6",
+    "input": "[masked:private-key]\nafter\n"
+  },
+  {
+    "name": "security/mask.test.ts:idempotent over the new fixtures#7",
+    "input": "before\n[masked:private-key]"
+  },
+  {
+    "name": "security/mask.test.ts:conn-string with whitespace after = is idempotent",
+    "input": "Server=x;Password = abc;\nServer=x;Password= abc\nServer=x;Pwd=\tabc\t\n"
+  },
+  {
+    "name": "security/mask.test.ts:conn-string with whitespace after = is idempotent#2",
+    "input": "Server=x;Password = [masked:conn-string];\nServer=x;Password= [masked:conn-string]\nServer=x;Pwd=\t[masked:conn-string]\n"
+  },
+  {
+    "name": "security/mask.test.ts:json-form headers",
+    "input": "{\"Authorization\": \"Bearer abcdefghijkl\"}\n\"Ocp-Apim-Subscription-Key\": \"abcdefgh\"\n{\"x-api-key\":\"abcdefgh\"}\n"
+  },
+  {
+    "name": "security/mask.test.ts:json-form headers#2",
+    "input": "{\"Authorization\": \"Bearer [masked:auth-header]\"}\n\"Ocp-Apim-Subscription-Key\": \"[masked:api-key-header]\"\n{\"x-api-key\":\"[masked:api-key-header]\"}\n"
+  },
+  {
+    "name": "security/mask.test.ts:keyword must end the key: token counts stay visible",
+    "input": "max_tokens: 100000\n\"cache_read_input_tokens\": 1234567\ninput_tokens=1234567\nsecretary: johnsmith\n"
+  },
+  {
+    "name": "security/mask.test.ts:keys ending in a keyword are masked",
+    "input": "access_token: abcdefghij\ndb.password=abcdefgh\n"
+  },
+  {
+    "name": "security/mask.test.ts:camelCase keys ending in a keyword are masked",
+    "input": "accessToken=abcdefghij\n\"apiKey\": \"abcdefgh\"\nclientSecret: abcdefghij\nrefreshToken: abcdefghij\nauthToken=abcdefghij\ndbPassword=abcdefghij\nopenaiApiKey: abcdefghij\nawsAccessKey=abcdefghij\nsmtpPasswd: abcdefghij\ndb2Pwd=abcdefghij\n{\"refreshToken\":\"abcdefgh\"}\ncfg.clientSecret = \"a b c\"\nMyToken: abcdefghij\n"
+  },
+  {
+    "name": "security/mask.test.ts:camelCase keys ending in a keyword are masked#2",
+    "input": "accessToken=[masked:password-kv]\n\"apiKey\": [masked:password-kv]\nclientSecret: [masked:password-kv]\nrefreshToken: [masked:password-kv]\nauthToken=[masked:password-kv]\ndbPassword=[masked:password-kv]\nopenaiApiKey: [masked:password-kv]\nawsAccessKey=[masked:password-kv]\nsmtpPasswd: [masked:password-kv]\ndb2Pwd=[masked:password-kv]\n{\"refreshToken\":[masked:password-kv]}\ncfg.clientSecret = [masked:password-kv]\nMyToken: [masked:password-kv]\n"
+  },
+  {
+    "name": "security/mask.test.ts:camelCase plural and longer keys, and camelCase pwd paths, stay visible",
+    "input": "maxTokens: 100000\n\"inputTokens\": 1234567\noutputTokens=1234567\ncacheReadInputTokens: 1234567\nmySecretary: johnsmith\ntokenizer: abcdefghij\ncurrentPwd: /home/user/project/src\noldPwd: C:\\Users\\x\\proj\n"
+  },
+  {
+    "name": "security/mask.test.ts:a value stops before an existing label, and scanning goes on after it",
+    "input": "token=abcdefg[masked:jwt],password=secret12 apiKey=ab[masked:jwt]\n"
+  },
+  {
+    "name": "security/mask.test.ts:a value stops before an existing label, and scanning goes on after it#2",
+    "input": "token=[masked:password-kv][masked:jwt],password=[masked:password-kv] apiKey=ab[masked:jwt]\n"
+  },
+  {
+    "name": "focus:1",
+    "input": "Q12345678901234567890😀: x"
+  },
+  {
+    "name": "focus:2",
+    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxé tail"
+  },
+  {
+    "name": "focus:3",
+    "input": "Progress: ٤٢% overall. Phase: x."
+  },
+  {
+    "name": "focus:4",
+    "input": "Q١: yes Ｑ1: yes"
+  },
+  {
+    "name": "port:js-space:nel is not JS whitespace",
+    "input": "password=abcdef ok"
+  },
+  {
+    "name": "port:js-space:bom is JS whitespace",
+    "input": "password=abc﻿defghi"
+  },
+  {
+    "name": "port:js-space:nel in a header value",
+    "input": "Authorization: Bearer abcdef end"
+  },
+  {
+    "name": "port:js-space:bom in a sas sig",
+    "input": "x?sig=abc﻿def"
+  },
+  {
+    "name": "port:js-space:nbsp in url credentials",
+    "input": "x://u:p w@h x://u:pw@h"
+  },
+  {
+    "name": "port:ascii-fold:long s in password",
+    "input": "paſſword=abcdefgh PASSWORD=abcdefgh"
+  },
+  {
+    "name": "port:ascii-fold:kelvin in api key",
+    "input": "x-api-Key: abcdefgh api_Key=abcdefgh"
+  },
+  {
+    "name": "port:ascii-fold:long s in basic",
+    "input": "Authorization: Baſic abcdefgh"
+  },
+  {
+    "name": "port:utf16:value of 6 units in 3 astral chars",
+    "input": "password=😀😀😀 end"
+  },
+  {
+    "name": "port:utf16:value of 4 units in 2 astral chars",
+    "input": "password=😀😀 end"
+  },
+  {
+    "name": "port:utf16:value of 6 units mixed",
+    "input": "token: é😀😀x"
+  },
+  {
+    "name": "port:look-behind:astral before a jwt",
+    "input": "😀eyJa.b.c éeyJa.b.c xeyJa.b.c"
+  },
+  {
+    "name": "port:look-behind:astral around a card",
+    "input": "😀4111111111111111😀"
+  },
+  {
+    "name": "port:look-behind:non-ascii digit before a card",
+    "input": "٤4111111111111111"
+  },
+  {
+    "name": "port:conn-string:crlf ends after the CR",
+    "input": "Server=a;Password=abc\r\nNext=1"
+  },
+  {
+    "name": "port:iban:lower-case country stays",
+    "input": "gb82WEST12345698765432"
+  },
+  {
+    "name": "port:bearer:non-ascii ends the token",
+    "input": "Bearer abcdefghijklmnopqrsétuvwxyz"
+  },
+  {
+    "name": "port:private-key:six dashes and no end",
+    "input": "-----BEGIN EC PRIVATE KEY------\nabc---\n-----END PUBLIC KEY-----"
+  }
+]

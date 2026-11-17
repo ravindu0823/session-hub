@@ -9,6 +9,8 @@
       "!**/*.md",
       "!**/bun.lock",
       "!**/packages.lock.json",
+      "!crates/**/tests/goldens",
+      "!crates/**/tests/corpus",
       "!gui/**/bin",
       "!gui/**/obj"
     ]

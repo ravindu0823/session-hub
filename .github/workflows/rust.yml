@@ -1,0 +1,88 @@
+name: rust
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --locked --workspace
+
+      # Fails when a rename leaves the filter matching fewer than the 2 timing tests.
+      - name: Masking runs in linear time (release)
+        run: |
+          set -o pipefail
+          cargo test --locked --release -p hub-core --test security -- --ignored mask_is_linear \
+            | tee linear.out
+          grep -q "test result: ok. 2 passed" linear.out
+
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+        with:
+          tool: cargo-llvm-cov,cargo-deny
+
+      - name: Coverage gate
+        run: scripts/coverage-gate.sh
+
+      - name: Dependency policy
+        run: cargo deny --locked check
+
+  rust-windows:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      SESSION_HUB_HEADLESS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The cfg(windows) code is linted only here.
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --locked --workspace
+
+      # Changes ACLs of throwaway temp dirs and focuses windows: like TS `bun run test:windows`.
+      - name: Windows suite
+        env:
+          SESSION_HUB_WINDOWS_SUITE: "1"
+        run: cargo test --locked -p hub-platform
+
+  rust-macos:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test
+        run: cargo test --locked --workspace

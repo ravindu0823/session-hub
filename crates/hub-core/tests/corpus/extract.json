@@ -1,0 +1,282 @@
+[
+  {
+    "name": "status/extract.test.ts:recommendations deduped and capped at 5",
+    "input": "**Progress: about 5% overall. Phase: x.**\nI recommend option 0\nI recommend option 1\nI recommend option 2\nI recommend option 3\nI recommend option 4\nI recommend option 5\nI recommend option 6\nI recommend option 7\nI recommend option 0\n"
+  },
+  {
+    "name": "status/extract.test.ts:recommendations deduped and capped at 5#2",
+    "input": "**Progress: about 5% overall. Phase: x.**\nMy Pick: A\nMy pick: A\nmy pick: A\n"
+  },
+  {
+    "name": "status/extract.test.ts:nothing in any case with period",
+    "input": "### What's remaining\nNOTHING.\n### Waiting on you\n- Nothing\n"
+  },
+  {
+    "name": "status/extract.test.ts:one-line answer is null",
+    "input": ""
+  },
+  {
+    "name": "status/extract.test.ts:section ends at next heading",
+    "input": "### What's remaining\n1. A\n## Other\n2. B\n### Waiting on you\n- Q1 ask\n"
+  },
+  {
+    "name": "status/extract.test.ts:bold-line heading of other section ends section",
+    "input": "**What's remaining**\n1. A\n**Waiting on you**\n- Q1 ask\n"
+  },
+  {
+    "name": "status/extract.test.ts:progress clamped and fence ignored",
+    "input": "**Progress: about 250% overall. Phase: p.**"
+  },
+  {
+    "name": "status/extract.test.ts:progress clamped and fence ignored#2",
+    "input": "```\n**Progress: about 50% overall. Phase: p.**\n```\n"
+  },
+  {
+    "name": "status/extract.test.ts:IDs",
+    "input": "### Waiting on you\n- Q15 a\n- SH10: b\n- NT56: c\n- BM3: d\n- **New:** SH9: e\n- **SH4**: f\n"
+  },
+  {
+    "name": "status/extract.test.ts:trailing paragraph, thematic break and table do not merge into last item",
+    "input": "### Waiting on you\n- Q1 approve x\n\nThanks, ping me when ready.\n\n---\nfooter\n"
+  },
+  {
+    "name": "status/extract.test.ts:trailing paragraph, thematic break and table do not merge into last item#2",
+    "input": "### Waiting on you\n- Q1 approve x\n---\n- Q2 no\n"
+  },
+  {
+    "name": "status/extract.test.ts:trailing paragraph, thematic break and table do not merge into last item#3",
+    "input": "### Waiting on you\n- Q1 approve x\n| a | b |\n|---|---|\n"
+  },
+  {
+    "name": "status/extract.test.ts:indented continuation after a blank line still joins",
+    "input": "### Waiting on you\n- Q1 approve x\n\n  and the rest\n"
+  },
+  {
+    "name": "status/extract.test.ts:lead-in line before first bullet is dropped",
+    "input": "### Waiting on you\nThese need you:\n- Q1 a\n- Q2 b\n"
+  },
+  {
+    "name": "status/extract.test.ts:code spans and arithmetic are not corrupted",
+    "input": "### Waiting on you\n- Q1 approve `src/*.ts` and **bold** and 2 * 3 * 4 and snake_case_name\n"
+  },
+  {
+    "name": "status/extract.test.ts:code spans and arithmetic are not corrupted#2",
+    "input": "### Waiting on you\n- Q2 __x__ and _y_ and `**z**`\n"
+  },
+  {
+    "name": "status/extract.test.ts:repeated heading: last with content wins",
+    "input": "### Waiting on you\n- Q1 first\n### Waiting on you\n- Q2 second\n"
+  },
+  {
+    "name": "status/extract.test.ts:repeated heading: last with content wins#2",
+    "input": "### Waiting on you\n- Q1 first\n### Waiting on you\n- nothing\n"
+  },
+  {
+    "name": "status/extract.test.ts:repeated heading: last with content wins#3",
+    "input": "### What's remaining\n1. A\n### What's remaining\n"
+  },
+  {
+    "name": "status/extract.test.ts:inline bold headings, bold hash headings and #### level",
+    "input": "**Waiting on you:** Q5 approve\n- Q6 more\n"
+  },
+  {
+    "name": "status/extract.test.ts:inline bold headings, bold hash headings and #### level#2",
+    "input": "**Waiting on you:** nothing\n"
+  },
+  {
+    "name": "status/extract.test.ts:inline bold headings, bold hash headings and #### level#3",
+    "input": "### **Waiting on you**\n- Q1 a\n"
+  },
+  {
+    "name": "status/extract.test.ts:inline bold headings, bold hash headings and #### level#4",
+    "input": "#### What's remaining\n1. A\n"
+  },
+  {
+    "name": "status/extract.test.ts:ID separators",
+    "input": "### Waiting on you\n- Q15, Q16: pick\n- **Q15** — x\n- Q15.5 y\n- Q15x z\n- SH9 - w\n- Q1-Q3 range\n"
+  },
+  {
+    "name": "status/extract.test.ts:remaining children fold into parent",
+    "input": "### What's remaining\n1. Build\n   - a\n   - b\n2. Before CI:\n   - c\n3. Plain\n"
+  },
+  {
+    "name": "status/extract.test.ts:progress anchored at line start, decimals rounded",
+    "input": "**Progress: about 33.5% overall. Phase: p.**"
+  },
+  {
+    "name": "status/extract.test.ts:progress anchored at line start, decimals rounded#2",
+    "input": "see **Progress: about 50% overall. Phase: p.** quoted"
+  },
+  {
+    "name": "status/extract.test.ts:progress anchored at line start, decimals rounded#3",
+    "input": "Progress: 40% overall. Phase: plain."
+  },
+  {
+    "name": "status/extract.test.ts:bold around ids and whole items",
+    "input": "### Waiting on you\n- **Q15:** text\n- **Q15 approve x**\n- **New:** **SH9:** go\n- **New: SH9** foo\n- SH1–SH8: answered.\n"
+  },
+  {
+    "name": "status/extract.test.ts:code span at item start is never an id",
+    "input": "### Waiting on you\n- `Q15` stays open\n- `S3 bucket` needs a policy\n- `V8` upgrade\n- `H2: foo`\n- _Q15_ foo\n"
+  },
+  {
+    "name": "status/extract.test.ts:hyphenated and multi-segment ids",
+    "input": "### Waiting on you\n- AUTH-Q1 pick a token lifetime\n- DB-Q1: which backup window\n- AB2-Q3, tool version\n- Q14 a\n- SH29 b\n- NT40 c\n- **AUTH-Q1:** bold id\n- New: **Q15** fresh\n- **New:** **DB-Q2** — also fresh\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids",
+    "input": "### Waiting on you\n- OK go\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#2",
+    "input": "### Waiting on you\n- Q alone\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#3",
+    "input": "### Waiting on you\n- A- dash\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#4",
+    "input": "### Waiting on you\n- AUTH- dash\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#5",
+    "input": "### Waiting on you\n- 2FA on\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#6",
+    "input": "### Waiting on you\n- q1 lower\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#7",
+    "input": "### Waiting on you\n- JavaScript upgrade\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#8",
+    "input": "### Waiting on you\n- AUTH-q1 lower\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#9",
+    "input": "### Waiting on you\n- AUTH-QA no digit\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#10",
+    "input": "### Waiting on you\n- AUTH--Q1 double dash\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#11",
+    "input": "### Waiting on you\n- E2E tests\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#12",
+    "input": "### Waiting on you\n- ABCDEFGHI1 segment too long\n"
+  },
+  {
+    "name": "status/extract.test.ts:words that are not ids#13",
+    "input": "### Waiting on you\n- AB1-CD2-EF3-GH4-IJ5-KL6-MN7 longer than 24\n"
+  },
+  {
+    "name": "status/extract.test.ts:ranges keep the first id and the whole text, with the new id shapes",
+    "input": "### Waiting on you\n- Q5–Q8: answered.\n- Q1-Q3 range\n- AUTH-Q1–AUTH-Q4: answered.\n- AUTH-Q1-AUTH-Q3 hyphen range\n- AUTH-Q1-Q3 short range\n- AUTH-Q3-Q1 not ascending\n- AUTH-Q1-XQ3 other stem\n"
+  },
+  {
+    "name": "focus:1",
+    "input": "**Progress: ٤٢% overall. Phase: x.**\n\n### Waiting on you\n- Q١: yes\n- Ｑ1: yes\n- Q1: ok\n"
+  },
+  {
+    "name": "focus:2",
+    "input": "**Progress: about 5% overall. Phase: x.**\n\n### Waiting on you\n- Q12345678901234567890😀: x\n- Q1234567890123456789中文字: x\n- Q12345678901234567890123: exactly\n"
+  },
+  {
+    "name": "focus:3",
+    "input": "**Progress: about 5% overall. Phase: x.**\n\n### Waiting on you\n- Q1: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxé tail\n- Q2: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀 tail\n"
+  },
+  {
+    "name": "port:round 0.49999999999999994",
+    "input": "**Progress: 0.49999999999999994% overall. Phase: a.**"
+  },
+  {
+    "name": "port:round halves up",
+    "input": "**Progress: 2.5% overall. Phase: a.**\n### What's remaining\n- a\n"
+  },
+  {
+    "name": "port:round 99.5",
+    "input": "Progress: about 99.5% overall. Phase: **b**"
+  },
+  {
+    "name": "port:round 100.5 clamped",
+    "input": "  *Progress: 100.5% overall.  Phase: c."
+  },
+  {
+    "name": "port:crlf and lone trailing cr",
+    "input": "### Waiting on you\r\n- Q1 a\r\n- Q2 b\r"
+  },
+  {
+    "name": "port:line separator in bullet",
+    "input": "### Waiting on you\n- Q1 a b\n- Q2 c\n"
+  },
+  {
+    "name": "port:nel is not js space, bom is",
+    "input": "### What's remaining\n﻿- a\n- b\n- c\n"
+  },
+  {
+    "name": "port:kelvin and long s do not fold",
+    "input": "### What’ſ remaining\n- a\n**Progress: 5% overall. Phase: x.**\nMy picK: z\nmy PICK: y\nRECOMMENDK w\n"
+  },
+  {
+    "name": "port:curly apostrophe heading",
+    "input": "## **What’s Remaining:** ##\n- a\n  - a1\n  - \n- b:\n  - b1\n"
+  },
+  {
+    "name": "port:underscores",
+    "input": "### Waiting on you\n- Q1 _a__ b_ __c__d __e_ f_g_ _h_\n- Q2 x_y_z _ a_ _b _ __ __\n- Q3 _é_ é_x_ (_y_) _z_. __w__\n"
+  },
+  {
+    "name": "port:stars",
+    "input": "### Waiting on you\n- Q1 ****x **y* *z** ***w*** * a * **\n- Q2 2*3*4 **b**c\n"
+  },
+  {
+    "name": "port:code holder injection",
+    "input": "### Waiting on you\n- Q1 0 and `k` 1 99999999999999999999 007\n- Q2 `a`  `b`\n"
+  },
+  {
+    "name": "port:new variants",
+    "input": "### Waiting on you\n- **New: SH9** foo\n- new:Q1 x\n- NEW:** Q2: y\n- **new:**Q3 – z\n- New: `Q4` code\n"
+  },
+  {
+    "name": "port:id edges",
+    "input": "### Waiting on you\n- Q12a x\n- AB1-CD2-x y\n- Q1–Q3 ranged\n- Q1 – Q3 dash\n- Q1 ,b\n- Q1 -\n- Q1 —　x\n- AUTH-Q1-Q3 r\n- Q3-Q1 nr\n- Q1:\n- AB2-Q3 one\n- A1-B2-C3 x\n- ABCDEFGH1 long\n- AB12345678 x\n"
+  },
+  {
+    "name": "port:tabs and nesting",
+    "input": "### Waiting on you\n- Q1 top\n\t- child one\n\t  more child\n    - child two\n- Q2 next\n\n  continued\n\nafter\n"
+  },
+  {
+    "name": "port:recommendation leads",
+    "input": "**Progress: 5% overall. Phase: x.**\n# recommend heading\n1) I recommend this\n• my pick x\n(recommended) ok\n- **Recommend:** `a b`\n2. \n"
+  },
+  {
+    "name": "port:fences",
+    "input": "**Progress: 5% overall. Phase: x.**\n   ```js\n### Waiting on you\n- Q1 hidden\n```\n### Waiting on you\n- Q2 shown\n```\nunclosed\n- Q3 hidden\n"
+  },
+  {
+    "name": "port:bold heading rests",
+    "input": "**Waiting on you**: Q1 do it\n**What's remaining:** a\rb\n**What's remaining** c\n"
+  },
+  {
+    "name": "port:unicode spaces",
+    "input": "### Waiting on you\n- Q1　x\n- Q2: y\n*\tQ3 z\n"
+  },
+  {
+    "name": "port:only nothing",
+    "input": "**What's remaining:** _Nothing._\n**Waiting on you** **nothing**\n"
+  },
+  {
+    "name": "port:plain paragraph items",
+    "input": "### What's remaining\nfirst line\ncontinues\n\nsecond para\n### Waiting on you\nQ1 plain\n"
+  },
+  {
+    "name": "port:table and break end section",
+    "input": "### Waiting on you\n- Q1 a\n***\n- Q2 b\n### What's remaining\n- r\n| t |\n- s\n"
+  }
+]

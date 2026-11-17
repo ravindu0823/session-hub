@@ -1,0 +1,236 @@
+[
+  {
+    "name": "tui/sanitize.test.ts:strips OSC 52 clipboard, title and hyperlink sequences (BEL and ST forms)",
+    "input": {
+      "fn": "text",
+      "s": "a\u001b]52;c;ZXZpbA==\u0007b"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:strips OSC 52 clipboard, title and hyperlink sequences (BEL and ST forms)#2",
+    "input": {
+      "fn": "text",
+      "s": "a\u001b]0;fake title\u001b\\b"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:strips OSC 52 clipboard, title and hyperlink sequences (BEL and ST forms)#3",
+    "input": {
+      "fn": "text",
+      "s": "\u001b]8;;http://x\u0007link\u001b]8;;\u0007"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:strips OSC 52 clipboard, title and hyperlink sequences (BEL and ST forms)#4",
+    "input": {
+      "fn": "text",
+      "s": "a\u001bP1$r\u001b\\b"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:strips CSI cursor moves, colours and erase",
+    "input": {
+      "fn": "text",
+      "s": "\u001b[2J\u001b[1;1H\u001b[31mred\u001b[0m \u001b[?25l"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:strips other ESC pairs, a trailing ESC, C1 and C0 controls; keeps newlines",
+    "input": {
+      "fn": "text",
+      "s": "a\u001b7b\u001bc\u001b"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:strips other ESC pairs, a trailing ESC, C1 and C0 controls; keeps newlines#2",
+    "input": {
+      "fn": "text",
+      "s": "a31mbc"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:strips other ESC pairs, a trailing ESC, C1 and C0 controls; keeps newlines#3",
+    "input": {
+      "fn": "text",
+      "s": "a\u0000b\bcd\ne"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:tab becomes two spaces; CRLF becomes LF; a lone CR is dropped",
+    "input": {
+      "fn": "text",
+      "s": "a\tb\r\nc\rd"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:drops bidi overrides",
+    "input": {
+      "fn": "text",
+      "s": "abc‮def⁦g"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:plain text is unchanged and cleaning is idempotent",
+    "input": {
+      "fn": "text",
+      "s": "Q15 NEW: pick [x] region, 100% (C:\\work)"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:plain text is unchanged and cleaning is idempotent#2",
+    "input": {
+      "fn": "text",
+      "s": "x\u001b]52;c;AA\u0007\u001b[1Ay\tz"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:plain text is unchanged and cleaning is idempotent#3",
+    "input": {
+      "fn": "text",
+      "s": "xy  z"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:drops ESC-prefixed input and escape tails Ink leaves behind",
+    "input": {
+      "fn": "input",
+      "s": "]",
+      "meta": true
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:drops ESC-prefixed input and escape tails Ink leaves behind#2",
+    "input": {
+      "fn": "input",
+      "s": "[200~",
+      "meta": false
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:drops ESC-prefixed input and escape tails Ink leaves behind#3",
+    "input": {
+      "fn": "input",
+      "s": "[201~",
+      "meta": false
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:drops ESC-prefixed input and escape tails Ink leaves behind#4",
+    "input": {
+      "fn": "input",
+      "s": "[31m",
+      "meta": false
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:drops ESC-prefixed input and escape tails Ink leaves behind#5",
+    "input": {
+      "fn": "input",
+      "s": "[1;5C",
+      "meta": false
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:keeps ordinary text, including bracket text with no parameters",
+    "input": {
+      "fn": "input",
+      "s": "[x",
+      "meta": false
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:keeps ordinary text, including bracket text with no parameters#2",
+    "input": {
+      "fn": "text",
+      "s": "[x"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:keeps ordinary text, including bracket text with no parameters#3",
+    "input": {
+      "fn": "input",
+      "s": "hello",
+      "meta": false
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:keeps ordinary text, including bracket text with no parameters#4",
+    "input": {
+      "fn": "text",
+      "s": "hello"
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:line breaks inside a pasted chunk become LF; controls go",
+    "input": {
+      "fn": "input",
+      "s": "a\rb\r\nc\u0013d",
+      "meta": false
+    }
+  },
+  {
+    "name": "tui/sanitize.test.ts:line breaks inside a pasted chunk become LF; controls go#2",
+    "input": {
+      "fn": "text",
+      "s": "a\nb\nc\u0013d"
+    }
+  },
+  {
+    "name": "port:esc before a latin-1 char",
+    "input": {
+      "fn": "text",
+      "s": "a\u001bé b"
+    }
+  },
+  {
+    "name": "port:nel is a C1 control",
+    "input": {
+      "fn": "text",
+      "s": "abc"
+    }
+  },
+  {
+    "name": "port:unterminated csi",
+    "input": {
+      "fn": "text",
+      "s": "a\u001b[12"
+    }
+  },
+  {
+    "name": "port:unterminated osc",
+    "input": {
+      "fn": "text",
+      "s": "a\u001b]0;title"
+    }
+  },
+  {
+    "name": "port:osc ended by ESC not ST",
+    "input": {
+      "fn": "text",
+      "s": "a\u001b]0;t\u001bxb"
+    }
+  },
+  {
+    "name": "port:input CR CR LF",
+    "input": {
+      "fn": "input",
+      "s": "a\r\r\nb",
+      "meta": false
+    }
+  },
+  {
+    "name": "port:input csi tail then newline is text",
+    "input": {
+      "fn": "input",
+      "s": "[31m\n",
+      "meta": false
+    }
+  },
+  {
+    "name": "port:bidi isolates and astral kept",
+    "input": {
+      "fn": "text",
+      "s": "⁧x⁩😀‪y"
+    }
+  }
+]

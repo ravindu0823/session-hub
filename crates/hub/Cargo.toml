@@ -1,0 +1,38 @@
+[package]
+name = "hub"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "hub"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hub"
+path = "src/main.rs"
+
+# Windows: the same commands without a console window (what `hub daemon start` and autostart run).
+# Other OSes build a stub that only says so.
+[[bin]]
+name = "hubw"
+path = "src/bin/hubw.rs"
+
+[dependencies]
+hub-core.workspace = true
+hub-platform = { path = "../hub-platform" }
+hub-tui = { path = "../hub-tui" }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

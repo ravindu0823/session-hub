@@ -1,0 +1,710 @@
+[
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw",
+    "input": "{not json"
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#2",
+    "input": ""
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#3",
+    "input": "42"
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#4",
+    "input": "null"
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#5",
+    "input": "[1]"
+  },
+  {
+    "name": "ingest/records.test.ts:bad json and non-objects never throw#6",
+    "input": "\"s\""
+  },
+  {
+    "name": "ingest/records.test.ts:an unrecognised type is never unknown, even with a version, and leaks no text",
+    "input": "{\"type\":\"new-shape\",\"version\":\"2.9.0\",\"text\":\"fixture x\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:object without a string type is an unrecognised type with empty type",
+    "input": "{}"
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"AB8 done, check it\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":true}}"
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#2",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":[{\"type\":\"text\",\"text\":\"Q1: yes\"},{\"type\":\"image\"}],\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":true}}"
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#3",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":true}}"
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#4",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":true}}"
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#5",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"Q1: yes\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"task-notification\"},\"humanTurn\":true}}"
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#6",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"Q1: yes\",\"origin\":{\"kind\":\"human\"},\"humanTurn\":false}}"
+  },
+  {
+    "name": "ingest/records.test.ts:an owner message typed while the session is busy is an owner prompt#7",
+    "input": "{\"type\":\"attachment\",\"uuid\":\"u-q\",\"timestamp\":\"2026-11-14T09:46:16.003Z\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"Q1: yes\",\"origin\":{\"kind\":\"human\"}}}"
+  },
+  {
+    "name": "ingest/records.test.ts:a numeric version is not carried on unknown",
+    "input": "{\"type\":\"user\",\"message\":null,\"version\":3}"
+  },
+  {
+    "name": "ingest/records.test.ts:sidechain and meta records are ignored before the shape check",
+    "input": "{\"type\":\"user\",\"isSidechain\":true,\"message\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:sidechain and meta records are ignored before the shape check#2",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types",
+    "input": "{\"type\":\"user\",\"message\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#2",
+    "input": "{\"type\":\"user\",\"attachment\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#3",
+    "input": "{\"type\":\"user\",\"content\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#4",
+    "input": "{\"type\":\"user\",\"origin\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#5",
+    "input": "{\"type\":\"user\",\"permissionMode\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#6",
+    "input": "{\"type\":\"user\",\"message\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#7",
+    "input": "{\"type\":\"user\",\"attachment\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#8",
+    "input": "{\"type\":\"user\",\"content\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#9",
+    "input": "{\"type\":\"user\",\"origin\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#10",
+    "input": "{\"type\":\"user\",\"permissionMode\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#11",
+    "input": "{\"type\":\"user\",\"message\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#12",
+    "input": "{\"type\":\"user\",\"attachment\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#13",
+    "input": "{\"type\":\"user\",\"content\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#14",
+    "input": "{\"type\":\"user\",\"origin\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#15",
+    "input": "{\"type\":\"user\",\"permissionMode\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#16",
+    "input": "{\"type\":\"user\",\"message\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#17",
+    "input": "{\"type\":\"user\",\"attachment\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#18",
+    "input": "{\"type\":\"user\",\"content\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#19",
+    "input": "{\"type\":\"user\",\"origin\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#20",
+    "input": "{\"type\":\"user\",\"permissionMode\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#21",
+    "input": "{\"type\":\"user\",\"message\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#22",
+    "input": "{\"type\":\"user\",\"attachment\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#23",
+    "input": "{\"type\":\"user\",\"content\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#24",
+    "input": "{\"type\":\"user\",\"origin\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#25",
+    "input": "{\"type\":\"user\",\"permissionMode\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#26",
+    "input": "{\"type\":\"user\",\"message\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#27",
+    "input": "{\"type\":\"user\",\"attachment\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#28",
+    "input": "{\"type\":\"user\",\"content\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#29",
+    "input": "{\"type\":\"user\",\"origin\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#30",
+    "input": "{\"type\":\"user\",\"permissionMode\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#31",
+    "input": "{\"type\":\"assistant\",\"message\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#32",
+    "input": "{\"type\":\"assistant\",\"attachment\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#33",
+    "input": "{\"type\":\"assistant\",\"content\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#34",
+    "input": "{\"type\":\"assistant\",\"origin\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#35",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#36",
+    "input": "{\"type\":\"assistant\",\"message\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#37",
+    "input": "{\"type\":\"assistant\",\"attachment\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#38",
+    "input": "{\"type\":\"assistant\",\"content\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#39",
+    "input": "{\"type\":\"assistant\",\"origin\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#40",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#41",
+    "input": "{\"type\":\"assistant\",\"message\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#42",
+    "input": "{\"type\":\"assistant\",\"attachment\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#43",
+    "input": "{\"type\":\"assistant\",\"content\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#44",
+    "input": "{\"type\":\"assistant\",\"origin\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#45",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#46",
+    "input": "{\"type\":\"assistant\",\"message\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#47",
+    "input": "{\"type\":\"assistant\",\"attachment\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#48",
+    "input": "{\"type\":\"assistant\",\"content\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#49",
+    "input": "{\"type\":\"assistant\",\"origin\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#50",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#51",
+    "input": "{\"type\":\"assistant\",\"message\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#52",
+    "input": "{\"type\":\"assistant\",\"attachment\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#53",
+    "input": "{\"type\":\"assistant\",\"content\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#54",
+    "input": "{\"type\":\"assistant\",\"origin\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#55",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#56",
+    "input": "{\"type\":\"assistant\",\"message\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#57",
+    "input": "{\"type\":\"assistant\",\"attachment\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#58",
+    "input": "{\"type\":\"assistant\",\"content\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#59",
+    "input": "{\"type\":\"assistant\",\"origin\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#60",
+    "input": "{\"type\":\"assistant\",\"permissionMode\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#61",
+    "input": "{\"type\":\"attachment\",\"message\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#62",
+    "input": "{\"type\":\"attachment\",\"attachment\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#63",
+    "input": "{\"type\":\"attachment\",\"content\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#64",
+    "input": "{\"type\":\"attachment\",\"origin\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#65",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#66",
+    "input": "{\"type\":\"attachment\",\"message\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#67",
+    "input": "{\"type\":\"attachment\",\"attachment\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#68",
+    "input": "{\"type\":\"attachment\",\"content\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#69",
+    "input": "{\"type\":\"attachment\",\"origin\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#70",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#71",
+    "input": "{\"type\":\"attachment\",\"message\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#72",
+    "input": "{\"type\":\"attachment\",\"attachment\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#73",
+    "input": "{\"type\":\"attachment\",\"content\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#74",
+    "input": "{\"type\":\"attachment\",\"origin\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#75",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#76",
+    "input": "{\"type\":\"attachment\",\"message\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#77",
+    "input": "{\"type\":\"attachment\",\"attachment\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#78",
+    "input": "{\"type\":\"attachment\",\"content\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#79",
+    "input": "{\"type\":\"attachment\",\"origin\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#80",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#81",
+    "input": "{\"type\":\"attachment\",\"message\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#82",
+    "input": "{\"type\":\"attachment\",\"attachment\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#83",
+    "input": "{\"type\":\"attachment\",\"content\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#84",
+    "input": "{\"type\":\"attachment\",\"origin\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#85",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#86",
+    "input": "{\"type\":\"attachment\",\"message\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#87",
+    "input": "{\"type\":\"attachment\",\"attachment\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#88",
+    "input": "{\"type\":\"attachment\",\"content\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#89",
+    "input": "{\"type\":\"attachment\",\"origin\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#90",
+    "input": "{\"type\":\"attachment\",\"permissionMode\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#91",
+    "input": "{\"type\":\"system\",\"message\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#92",
+    "input": "{\"type\":\"system\",\"attachment\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#93",
+    "input": "{\"type\":\"system\",\"content\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#94",
+    "input": "{\"type\":\"system\",\"origin\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#95",
+    "input": "{\"type\":\"system\",\"permissionMode\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#96",
+    "input": "{\"type\":\"system\",\"message\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#97",
+    "input": "{\"type\":\"system\",\"attachment\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#98",
+    "input": "{\"type\":\"system\",\"content\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#99",
+    "input": "{\"type\":\"system\",\"origin\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#100",
+    "input": "{\"type\":\"system\",\"permissionMode\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#101",
+    "input": "{\"type\":\"system\",\"message\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#102",
+    "input": "{\"type\":\"system\",\"attachment\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#103",
+    "input": "{\"type\":\"system\",\"content\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#104",
+    "input": "{\"type\":\"system\",\"origin\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#105",
+    "input": "{\"type\":\"system\",\"permissionMode\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#106",
+    "input": "{\"type\":\"system\",\"message\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#107",
+    "input": "{\"type\":\"system\",\"attachment\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#108",
+    "input": "{\"type\":\"system\",\"content\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#109",
+    "input": "{\"type\":\"system\",\"origin\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#110",
+    "input": "{\"type\":\"system\",\"permissionMode\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#111",
+    "input": "{\"type\":\"system\",\"message\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#112",
+    "input": "{\"type\":\"system\",\"attachment\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#113",
+    "input": "{\"type\":\"system\",\"content\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#114",
+    "input": "{\"type\":\"system\",\"origin\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#115",
+    "input": "{\"type\":\"system\",\"permissionMode\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#116",
+    "input": "{\"type\":\"system\",\"message\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#117",
+    "input": "{\"type\":\"system\",\"attachment\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#118",
+    "input": "{\"type\":\"system\",\"content\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#119",
+    "input": "{\"type\":\"system\",\"origin\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#120",
+    "input": "{\"type\":\"system\",\"permissionMode\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#121",
+    "input": "{\"type\":\"permission-mode\",\"message\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#122",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#123",
+    "input": "{\"type\":\"permission-mode\",\"content\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#124",
+    "input": "{\"type\":\"permission-mode\",\"origin\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#125",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":null}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#126",
+    "input": "{\"type\":\"permission-mode\",\"message\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#127",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#128",
+    "input": "{\"type\":\"permission-mode\",\"content\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#129",
+    "input": "{\"type\":\"permission-mode\",\"origin\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#130",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":42}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#131",
+    "input": "{\"type\":\"permission-mode\",\"message\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#132",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#133",
+    "input": "{\"type\":\"permission-mode\",\"content\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#134",
+    "input": "{\"type\":\"permission-mode\",\"origin\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#135",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":\"s\"}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#136",
+    "input": "{\"type\":\"permission-mode\",\"message\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#137",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#138",
+    "input": "{\"type\":\"permission-mode\",\"content\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#139",
+    "input": "{\"type\":\"permission-mode\",\"origin\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#140",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":[]}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#141",
+    "input": "{\"type\":\"permission-mode\",\"message\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#142",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#143",
+    "input": "{\"type\":\"permission-mode\",\"content\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#144",
+    "input": "{\"type\":\"permission-mode\",\"origin\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#145",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":{}}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#146",
+    "input": "{\"type\":\"permission-mode\",\"message\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#147",
+    "input": "{\"type\":\"permission-mode\",\"attachment\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#148",
+    "input": "{\"type\":\"permission-mode\",\"content\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#149",
+    "input": "{\"type\":\"permission-mode\",\"origin\":true}"
+  },
+  {
+    "name": "ingest/records.test.ts:classify never throws on odd values in parsed types#150",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":true}"
+  },
+  {
+    "name": "focus:1",
+    "input": "{\"type\":\"permission-mode\",\"permissionMode\":\"plan\"}\r"
+  },
+  {
+    "name": "focus:2",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"crlf\"},\"uuid\":\"c-1\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"},\"cwd\":\"C:\\\\Program Files\\\\x\"}\r"
+  },
+  {
+    "name": "focus:3",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"cwd\"},\"uuid\":\"c-2\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"},\"cwd\":\"C:\\\\Program Files\\\\x\"}"
+  },
+  {
+    "name": "focus:4",
+    "input": "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀xxxxx\"}]},\"uuid\":\"a-9\",\"timestamp\":\"t\"}"
+  },
+  {
+    "name": "focus:5",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"﻿<local-command-stdout>x</local-command-stdout>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}"
+  },
+  {
+    "name": "focus:6",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\" <local-command-stderr>x</local-command-stderr>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}"
+  },
+  {
+    "name": "focus:7",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"<local-command-stdout>x</local-command-stdout>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}"
+  },
+  {
+    "name": "focus:8",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"\\n  <local-command-stderr>x</local-command-stderr>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}"
+  },
+  {
+    "name": "focus:9",
+    "input": "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"see <local-command-stdout>x</local-command-stdout>\"},\"uuid\":\"u-lc\",\"timestamp\":\"t\",\"origin\":{\"kind\":\"human\"}}"
+  }
+]

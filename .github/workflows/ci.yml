@@ -31,6 +31,9 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile --ignore-scripts
 
+      - name: Rust goldens up to date
+        run: bun scripts/rust-goldens.ts && git diff --exit-code crates/hub-core/tests/goldens
+
       - name: Lint
         run: bun run lint
 
@@ -78,7 +81,7 @@ jobs:
           set -euo pipefail
           docker run --rm -v "$PWD:/src:ro" -v "$RUNNER_TEMP:/out" -w /src "$SEMGREP_IMAGE" \
             semgrep scan --metrics=off --disable-version-check \
-              --config p/owasp-top-ten --config p/secrets --config p/csharp --config p/typescript \
+              --config p/owasp-top-ten --config p/secrets --config p/csharp --config p/typescript --config p/rust \
               --exclude test/fixtures --json --output /out/semgrep.json
           jq -r '.results[] | "\(.extra.severity) \(.check_id) \(.path):\(.start.line)"' "$RUNNER_TEMP/semgrep.json"
           jq -e '[.results[] | select(.extra.severity == "ERROR")] | length == 0' "$RUNNER_TEMP/semgrep.json"
