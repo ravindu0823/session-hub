@@ -68,6 +68,37 @@ function seed(store: Store): void {
   store.upsertSession(
     session({ sessionId: "s-gamma", name: "gamma", status: "unknown", endedAt: T0 - 7_200_000 }),
   );
+  // Mail and decisions (src/mail): one open decision, one answered with a different second answer
+  // (a conflict), and mail queued for a role with no live session.
+  store.mail().createDecision({
+    role: "alpha",
+    question: "Ship the release?\nIt has two open bugs.",
+    options: ["yes", "no"],
+    recommendation: "yes",
+    fromSession: "s-alpha",
+    createdAt: T0 - 30_000,
+  });
+  store.mail().createDecision({
+    role: "gamma",
+    question: "Rename the \u001b[31mtable\u001b[0m?",
+    options: [],
+    recommendation: null,
+    fromSession: null,
+    createdAt: T0 - 20_000,
+  });
+  store.mail().answerDecision("D-0002", "yes", "cli", T0 - 10_000);
+  store.mail().answerDecision("D-0002", "no", "tray", T0 - 5_000);
+  store.mail().insert({
+    thread: "T-1",
+    fromRole: "alpha",
+    fromSession: null,
+    toRole: "docs",
+    kind: "task",
+    body: "update the guide",
+    evidence: null,
+    createdAt: T0 - 15_000,
+    expiresAt: T0 + 3_600_000,
+  });
   // One message over 256 KiB: history returns it cut, with textTruncated.
   store.upsertSession(session({ sessionId: "s-big", name: "big", pid: 4103 }));
   store.addMessages("s-big", [
