@@ -5,7 +5,7 @@ export type LogFields = Record<string, number | boolean | string>;
 
 /**
  * Never pass message text, prompts, bodies or status text. Only counts, timings, ids, names and
- * error names/messages from our own code.
+ * caught errors through errFields, which removes file paths (PII-04).
  */
 export interface Logger {
   info(event: string, fields?: LogFields): void;
@@ -21,10 +21,33 @@ function clip(s: string): string {
   return s.length > MAX_FIELD_CHARS ? s.slice(0, MAX_FIELD_CHARS) : s;
 }
 
-/** Fields for a caught error: its name and message, truncated. */
+/** A quoted string that holds a path: file-system errors quote the path they failed on. */
+const QUOTED_PATH_RE = /(['"`])(?:[A-Za-z]:[\\/]|\\\\|\/)[^'"`]*\1/g;
+/** An unquoted absolute path: drive (C:\ or C:/), UNC (\\host) or rooted POSIX (/a/b). */
+const BARE_PATH_RE = /(?:[A-Za-z]:[\\/]|\\\\)[^\s'"`]*|(?<![\w.:])\/(?:[^\s'"`/]+\/)+[^\s'"`]*/g;
+
+/**
+ * Error text without file paths. File-system errors name the full path they failed on, which holds
+ * the user name and project folders (personal data, PII-04); the error code says what happened.
+ */
+export function redactPaths(text: string): string {
+  return text.replace(QUOTED_PATH_RE, "<path>").replace(BARE_PATH_RE, "<path>");
+}
+
+/**
+ * Fields for a caught error. A system error (one with a code such as ENOENT or EBUSY) gives only its
+ * name and code: its message quotes the path it failed on. Any other error is our own fixed text and
+ * keeps its message, with paths removed all the same.
+ */
 export function errFields(e: unknown): LogFields {
-  if (e instanceof Error) return { err: clip(e.name), msg: clip(e.message) };
-  return { err: "Error", msg: clip(String(e)) };
+  if (e instanceof Error) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string" && /^[A-Z0-9_]{1,40}$/.test(code)) {
+      return { err: clip(e.name), code };
+    }
+    return { err: clip(e.name), msg: clip(redactPaths(e.message)) };
+  }
+  return { err: "Error", msg: clip(redactPaths(String(e))) };
 }
 
 /** JSON lines to `<dir>/<file>` (default daemon.log), rotated at `maxBytes` keeping .1 and .2. */

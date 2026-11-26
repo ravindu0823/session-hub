@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLogger, errFields } from "../../src/daemon/log.ts";
@@ -78,5 +78,45 @@ describe("errFields", () => {
     expect(f.err).toBe("TypeError");
     expect((f.msg as string).length).toBe(200);
     expect(errFields("plain")).toEqual({ err: "Error", msg: "plain" });
+  });
+
+  test("a file-system error keeps its code, never its path (PII-04)", () => {
+    let caught: unknown;
+    try {
+      statSync(join(dir, "Jane Doe", "secret-project", "a b.jsonl"));
+    } catch (e) {
+      caught = e;
+    }
+    const f = errFields(caught);
+    expect(f).toEqual({ err: "Error", code: "ENOENT" });
+    for (const leak of ["Jane", "Doe", "secret-project", "a b.jsonl"]) {
+      expect(JSON.stringify(f)).not.toContain(leak);
+    }
+  });
+
+  test("absolute paths are removed from any error text", () => {
+    const cases: [string, string][] = [
+      ["open C:\\Users\\jane\\x.json failed", "open <path> failed"],
+      ["stat 'D:/work/my proj/x.jsonl'", "stat <path>"],
+      ['read "C:\\a b\\c"', "read <path>"],
+      ["share \\\\host\\share\\f is gone", "share <path> is gone"],
+      ["no /home/jane/.claude/x here", "no <path> here"],
+      ["database is locked", "database is locked"],
+      ["UNIQUE constraint failed: mail.id", "UNIQUE constraint failed: mail.id"],
+    ];
+    for (const [text, want] of cases) expect(errFields(new Error(text)).msg).toBe(want);
+    expect(errFields("bad C:\\x\\y").msg).toBe("bad <path>");
+  });
+
+  test("canary: a path in a logged error never reaches daemon.log", () => {
+    const log = createLogger(dir);
+    try {
+      statSync(join(dir, "canary-folder-7f3", "t.jsonl"));
+    } catch (e) {
+      log.warn("scan_error", { session: "s1", ...errFields(e) });
+    }
+    const text = readFileSync(join(dir, "daemon.log"), "utf8");
+    expect(text).toContain('"code":"ENOENT"');
+    expect(text).not.toContain("canary-folder-7f3");
   });
 });
