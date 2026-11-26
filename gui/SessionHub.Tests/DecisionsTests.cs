@@ -23,10 +23,13 @@ public class DecisionsTests
         public readonly List<BridgeRequest> Requests = [];
         public Reply Next = Ok("""{"result":"answered","role":"alpha"}""");
 
+        /// <summary>When set, replies wait for it.</summary>
+        public TaskCompletionSource<Reply>? Hold;
+
         public Task<Reply> RequestAsync(BridgeRequest request, TimeSpan timeout)
         {
             Requests.Add(request);
-            return Task.FromResult(Next);
+            return Hold?.Task ?? Task.FromResult(Next);
         }
     }
 
@@ -197,6 +200,88 @@ public class DecisionsTests
         Assert.False(vm.Items[0].CanAnswer);
         await vm.AnswerAsync(vm.Items[0], replace: false);
         Assert.Empty(bridge.Requests);
+    }
+
+    [Fact]
+    public async Task ASecondAnswerWhileTheFirstIsInFlightSendsNothing()
+    {
+        var bridge = new FakeBridge { Hold = new TaskCompletionSource<Reply>() };
+        var vm = new DecisionsViewModel(bridge.RequestAsync);
+        vm.Apply(Fixture().Mail);
+        var card = vm.Items[0];
+        card.Draft = "yes";
+        var first = vm.AnswerAsync(card, replace: false);
+        Assert.True(card.IsBusy);
+        Assert.False(card.CanAnswer);
+        await vm.AnswerAsync(card, replace: false);
+        Assert.Single(bridge.Requests);
+        bridge.Hold.SetResult(Ok("""{"result":"answered","role":"alpha"}"""));
+        await first;
+        Assert.False(card.IsBusy);
+        Assert.Single(bridge.Requests);
+    }
+
+    [Fact]
+    public async Task ABridgeRestartAfterTheWriteIsNotRetried()
+    {
+        var bridge = new FakeBridge { Next = Error("bridge-restarted", "bridge ended before the reply") };
+        var vm = new DecisionsViewModel(bridge.RequestAsync);
+        vm.Apply(Fixture().Mail);
+        vm.Items[0].Draft = "yes";
+        await vm.AnswerAsync(vm.Items[0], replace: false);
+        Assert.Single(bridge.Requests);
+        Assert.Contains("may have been stored", vm.Items[0].Status);
+        Assert.Equal("yes", vm.Items[0].Draft);
+    }
+
+    [Theory]
+    [InlineData("same", "Already answered with the same text", false, "")]
+    [InlineData("closed", "D-0001 is closed", true, "yes")]
+    [InlineData("not-found", "D-0001 no longer exists", true, "yes")]
+    [InlineData("later-result", "does not understand", true, "yes")]
+    public async Task OtherResultsSayWhatHappened(string result, string status, bool isError, string draftAfter)
+    {
+        var bridge = new FakeBridge { Next = Ok($$"""{"result":"{{result}}","role":"alpha"}""") };
+        var vm = new DecisionsViewModel(bridge.RequestAsync);
+        vm.Apply(Fixture().Mail);
+        var card = vm.Items[0];
+        card.Draft = "yes";
+        await vm.AnswerAsync(card, replace: false);
+        Assert.Contains(status, card.Status);
+        Assert.Equal(isError, card.StatusIsError);
+        Assert.Equal(draftAfter, card.Draft);
+        Assert.False(card.CanReplace);
+    }
+
+    [Fact]
+    public async Task ReplaceEndsWhenTheDecisionChanges()
+    {
+        var bridge = new FakeBridge { Next = Ok("""{"result":"conflict","role":"gamma"}""") };
+        var vm = new DecisionsViewModel(bridge.RequestAsync);
+        var mail = Fixture().Mail!;
+        vm.Apply(mail);
+        var card = vm.Items[1];
+        card.Draft = "no";
+        await vm.AnswerAsync(card, replace: false);
+        Assert.True(card.CanReplace);
+        vm.Apply(mail);
+        Assert.True(card.CanReplace);
+        var changed = mail.Decisions[1] with { Answer = "no", AnsweredVia = "cli", Conflicts = 2 };
+        vm.Apply(mail with { Decisions = [mail.Decisions[0], changed] });
+        Assert.False(card.CanReplace);
+    }
+
+    [Fact]
+    public void ADraftComesBackWithItsCardAfterAnEmptySnapshot()
+    {
+        var vm = new DecisionsViewModel(new FakeBridge().RequestAsync);
+        var mail = Fixture().Mail!;
+        vm.Apply(mail);
+        vm.Items[0].Draft = "yes, after the fix";
+        vm.Apply(mail with { Decisions = [] });
+        Assert.Empty(vm.Items);
+        vm.Apply(mail);
+        Assert.Equal("yes, after the fix", vm.Items.First(c => c.Id == "D-0001").Draft);
     }
 
     [Fact]

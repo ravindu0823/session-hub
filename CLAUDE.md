@@ -84,7 +84,8 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   the hub only brings that window to the front. Never add a path that answers a permission prompt.
 - Mail (`src/mail`) is peer text from any process that can write `hub.db`: shown as data with a notice, never an
   approval. A session's role comes from the session the daemon indexed for `CLAUDE_CODE_SESSION_ID` (outside Claude
-  Code the caller is `owner`); `hub answer` refuses to run inside a session. Text that looks secret is refused, not
+  Code the caller is `owner`); `hub answer` refuses to run inside a session, and so does the bridge's `answer`
+  request (the tray is started without the session variables). Text that looks secret is refused, not
   masked, so mail arrives byte for byte. Every state change is one conditional statement; mail ids never repeat.
   Role names, profiles and people live only in the local `roles.json`, never in the repository or its tests.
 - A waiting item is "answered" when the owner's own message or a `session-hub-relay` message after the status reply
@@ -104,13 +105,14 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   A deliberate stop (`hub daemon stop`, install, uninstall) writes `run\daemon.stopped` first so it is not
   undone; every daemon run removes it.
 - Third-party callers: none. The app has no inbound endpoint, webhook or deploy hook, so SEC-06 has nothing to cover.
-  Its only inputs are local files written by Claude Code, the tray's stdin/stdout bridge child, and the `hub mail`,
-  `hub ask` and `hub answer` commands that local sessions and the owner run.
+  Its only inputs are local files written by Claude Code, the tray's stdin/stdout bridge child (which also takes
+  the owner's decision answers), and the `hub mail`, `hub ask` and `hub answer` commands that local sessions and
+  the owner run.
 
 ## Target architecture
 - Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index and owns its schema; the TUI and the
-  `hub bridge` child of the tray read it. `hub mail`, `hub ask` and `hub answer` write only the mail and decision
-  tables, and refuse an index at an older schema instead of upgrading it. No network, no services, no cloud. Deploy
+  `hub bridge` child of the tray read it. `hub mail`, `hub ask`, `hub answer` and the bridge's `answer` request
+  write only the mail and decision tables; the commands refuse an index at an older schema instead of upgrading it. No network, no services, no cloud. Deploy
   target: `hub install` on the owner's PC from a reviewed build; each release needs a passing Windows test report
   (`scripts/test-windows-report.ps1`) and a passing `bun run relay-eval` in each profile (real relays to throwaway
   `sh-eval-*` background sessions; the report script runs `relay-eval --check`, which fails until both profiles have a

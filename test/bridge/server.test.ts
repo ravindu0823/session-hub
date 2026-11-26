@@ -972,6 +972,41 @@ describe("answer", () => {
     expect(replies()[0]).toMatchObject({ id: 6, ok: false, error: { code: "empty-body" } });
   });
 
+  test("inside a Claude Code session the bridge refuses answers and stores nothing", async () => {
+    ask();
+    start({ insideSession: () => true });
+    await flush();
+    await request('{"id":10,"type":"answer","decisionId":"D-0001","text":"yes"}');
+    expect(replies()[0]).toMatchObject({ id: 10, ok: false, error: { code: "not-owner" } });
+    expect(other.mail().getDecision("D-0001")?.state).toBe("open");
+    expect(other.mail().inbox("web")).toEqual([]);
+  });
+
+  test("an answer that looks like a secret is refused and nothing is stored", async () => {
+    ask();
+    start();
+    await flush();
+    await request(
+      '{"id":11,"type":"answer","decisionId":"D-0001","text":"token ghp_abcdefghijklmnopqrstuvwxyz0123456789"}',
+    );
+    expect(replies()[0]).toMatchObject({ id: 11, ok: false, error: { code: "looks-secret" } });
+    expect(other.mail().getDecision("D-0001")?.answer).toBeNull();
+    expect(other.mail().inbox("web")).toEqual([]);
+  });
+
+  test("a store failure inside the answer replies store-error and rolls the answer back", async () => {
+    ask();
+    const mail = store.mail();
+    mail.insert = () => {
+      throw new Error("database is locked");
+    };
+    start();
+    await flush();
+    await request('{"id":12,"type":"answer","decisionId":"D-0001","text":"yes"}');
+    expect(replies()[0]).toMatchObject({ id: 12, ok: false, error: { code: "store-error" } });
+    expect(other.mail().getDecision("D-0001")).toMatchObject({ state: "open", answer: null });
+  });
+
   test("bad answer requests are bad-request", async () => {
     start();
     await flush();

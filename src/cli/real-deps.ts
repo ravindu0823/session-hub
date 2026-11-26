@@ -11,7 +11,7 @@ import { createLogger } from "../daemon/log.ts";
 import { realClaudeCli } from "../discovery/agents.ts";
 import { runMailCli } from "../mail/cli.ts";
 import { parseRolesConfig, type RolesConfig, rolesLoader } from "../mail/roles.ts";
-import { mailUpkeep } from "../mail/service.ts";
+import { insideClaudeCode, mailUpkeep, withoutSessionEnv } from "../mail/service.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
 import { claimMarkerFile, runGuard } from "../send/guard.ts";
@@ -50,16 +50,23 @@ function isAlive(pid: number): boolean {
  */
 function spawnDetached(
   argv: string[],
-  opts: { env?: Record<string, string>; verbatim?: boolean; hide?: boolean; cwd?: string } = {},
+  opts: {
+    env?: Record<string, string>;
+    verbatim?: boolean;
+    hide?: boolean;
+    cwd?: string;
+    outsideSession?: boolean;
+  } = {},
 ): void {
   const [cmd, ...args] = argv;
   if (cmd === undefined) throw new Error("spawnDetached: empty argv");
+  const base = opts.outsideSession ? withoutSessionEnv(process.env) : process.env;
   const child = spawn(cmd, args, {
     detached: true,
     stdio: "ignore",
     windowsHide: opts.hide ?? true,
     windowsVerbatimArguments: opts.verbatim ?? false,
-    env: opts.env ? { ...process.env, ...opts.env } : process.env,
+    env: opts.env ? { ...base, ...opts.env } : base,
     ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
   });
   child.on("error", () => {}); // a failed spawn shows up as "did not start"
@@ -182,6 +189,7 @@ export async function runRealBridge(
     sleep: (ms) => Bun.sleep(ms),
     version: opts.version,
     roles: () => parseRolesConfig(readRolesFile(paths.dataDir)),
+    insideSession: () => insideClaudeCode(process.env),
   };
   // A broken stdout means the tray cannot hear us: say so once on stderr and stop with exit 1.
   let broken = false;
@@ -260,7 +268,11 @@ export function realCliDeps(opts: {
     out: (line) => process.stdout.write(`${line}\n`),
     err: (line) => process.stderr.write(`${line}\n`),
     spawnDetached: (argv, o) =>
-      spawnDetached(argv, { hide: !o?.gui, ...(o?.cwd === undefined ? {} : { cwd: o.cwd }) }),
+      spawnDetached(argv, {
+        hide: !o?.gui,
+        ...(o?.cwd === undefined ? {} : { cwd: o.cwd }),
+        ...(o?.outsideSession ? { outsideSession: true } : {}),
+      }),
     removeAfterExit,
     isAlive,
     killTree,

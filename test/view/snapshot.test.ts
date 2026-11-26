@@ -159,6 +159,30 @@ describe("mail in the snapshot", () => {
     expect(d[1]).toMatchObject({ answer: "no", answeredVia: "cli", answeredAt: 20 });
   });
 
+  test("bidi overrides and isolates in a decision's strings are stripped", () => {
+    store.mail().createDecision({
+      role: "web",
+      question: "Ship \u202Eevil\u2066?",
+      options: ["y\u202Des"],
+      recommendation: "y\u2067es",
+      fromSession: null,
+      createdAt: 1,
+    });
+    store.mail().answerDecision("D-0001", "o\u202Ek", "tr\u2069ay", 2);
+    const d = readSnapshot(store, OPTS).mail.decisions[0];
+    expect(d).toMatchObject({
+      question: "Ship evil?",
+      options: ["yes"],
+      recommendation: "yes",
+      answer: "ok",
+      answeredVia: "tray",
+    });
+    const all = JSON.stringify(d);
+    for (const c of [0x202d, 0x202e, 0x2066, 0x2067, 0x2069]) {
+      expect(all.includes(String.fromCharCode(c))).toBe(false);
+    }
+  });
+
   test("a conflicting second answer shows in the conflict count", () => {
     ask("web", "q?", 1);
     store.mail().answerDecision("D-0001", "yes", "tray", 2);

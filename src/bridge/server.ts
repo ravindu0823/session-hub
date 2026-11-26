@@ -62,6 +62,11 @@ export interface BridgeDeps {
   version: string;
   /** The local roles file, parsed (src/mail/roles.ts); without it a session's role is its name. */
   roles?(): RolesConfig;
+  /**
+   * True when this bridge runs inside a Claude Code session (its environment says so). Answers are
+   * then refused, as `hub answer` refuses: it prevents mistakes, it is not proof of who answers.
+   */
+  insideSession?(): boolean;
 }
 
 const KNOWN_PROFILES: readonly string[] = PROFILES.map((p) => p.id);
@@ -525,6 +530,13 @@ class Bridge {
    * come back as the result for the tray to show; a refused text is an error with its reason.
    */
   private answer(req: Extract<Request, { type: "answer" }>): void {
+    if (this.deps.insideSession?.() === true) {
+      this.replyError(req.id, {
+        code: "not-owner",
+        message: "answers are for the owner, from a tray started outside Claude Code sessions",
+      });
+      return;
+    }
     const store = this.openStore();
     if (store === null) {
       this.replyError(req.id, { code: "no-store", message: NO_STORE });

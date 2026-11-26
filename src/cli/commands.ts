@@ -171,7 +171,14 @@ export interface CliDeps {
    * Detached, stdio ignored, unref'd; hidden unless `gui` (a GUI app started hidden can get its
    * first window hidden too). `cwd` defaults to this process's cwd.
    */
-  spawnDetached(argv: string[], opts?: { gui?: boolean; cwd?: string }): void;
+  /**
+   * `outsideSession`: drop the Claude Code session variables (CLAUDECODE, CLAUDE_CODE_*), so a child
+   * started from a session's shell (`hub install` run by a session) is never taken for that session.
+   */
+  spawnDetached(
+    argv: string[],
+    opts?: { gui?: boolean; cwd?: string; outsideSession?: boolean },
+  ): void;
   /** Removes these paths once this process has exited (a running exe cannot delete itself). */
   removeAfterExit(paths: string[]): void;
   isAlive(pid: number): boolean;
@@ -359,7 +366,12 @@ async function stopTray(d: CliDeps): Promise<string | null> {
 async function startTray(d: CliDeps): Promise<StartResult> {
   const pid = ourTrayPid(d);
   if (pid !== null) return { kind: "already", pid };
-  d.spawnDetached([d.paths.installedTrayExe], { gui: true, cwd: d.paths.binDir });
+  // The tray and its bridge child answer decisions for the owner: never as a session (see answer()).
+  d.spawnDetached([d.paths.installedTrayExe], {
+    gui: true,
+    cwd: d.paths.binDir,
+    outsideSession: true,
+  });
   const started = await waitFor(d, () => ourTrayPid(d));
   return started === null ? { kind: "failed" } : { kind: "started", pid: started };
 }

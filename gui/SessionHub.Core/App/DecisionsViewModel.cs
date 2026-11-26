@@ -103,7 +103,9 @@ public sealed class DecisionCardViewModel : ObservableObject
     {
         var before = view;
         view = next;
-        if (before == next) return;
+        if (Same(before, next)) return;
+        // Replace answered a conflict with the answer that was there; a new state or answer ends it.
+        if (before.State != next.State || before.Answer != next.Answer) CanReplace = false;
         Raise(nameof(Role));
         Raise(nameof(IsOpen));
         Raise(nameof(Header));
@@ -112,6 +114,10 @@ public sealed class DecisionCardViewModel : ObservableObject
         Raise(nameof(RecommendationText));
         Raise(nameof(AnswerText));
     }
+
+    // Record equality compares the Options list by reference; compare its items.
+    private static bool Same(DecisionView a, DecisionView b) =>
+        a with { Options = [] } == b with { Options = [] } && a.Options.SequenceEqual(b.Options, StringComparer.Ordinal);
 
     internal void Begin()
     {
@@ -141,6 +147,9 @@ public sealed class DecisionsViewModel : ObservableObject
     public static readonly TimeSpan AnswerTimeout = TimeSpan.FromSeconds(15);
 
     private readonly Func<BridgeRequest, TimeSpan, Task<Reply>> request;
+    // Drafts of cards that left the list (an empty snapshot while the index is missing, a bridge
+    // restart): a card that comes back gets its draft again. Lost when the tray exits.
+    private readonly Dictionary<string, string> parkedDrafts = new(StringComparer.Ordinal);
     private int openCount;
     private bool hasAny;
 
@@ -183,9 +192,23 @@ public sealed class DecisionsViewModel : ObservableObject
         var wanted = new List<DecisionCardViewModel>(shown.Count);
         foreach (var d in shown)
         {
-            if (byId.TryGetValue(d.Id, out var card)) card.Update(d);
-            else card = new DecisionCardViewModel(d);
+            if (byId.TryGetValue(d.Id, out var card))
+            {
+                card.Update(d);
+            }
+            else
+            {
+                card = new DecisionCardViewModel(d);
+                if (parkedDrafts.Remove(d.Id, out var parked)) card.Draft = parked;
+            }
+
             wanted.Add(card);
+        }
+
+        var keep = new HashSet<string>(shown.Select(d => d.Id), StringComparer.Ordinal);
+        foreach (var gone in Items.Where(c => !keep.Contains(c.Id) && c.Draft.Length > 0))
+        {
+            parkedDrafts[gone.Id] = gone.Draft;
         }
 
         // No reorder: a Move would rebuild the card under the answer box's caret.
