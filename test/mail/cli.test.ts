@@ -433,7 +433,11 @@ describe("review fixes", () => {
     ];
     const errs = (await run("mail", ["inbox"], { CLAUDE_CODE_SESSION_ID: "s-bad" })).err;
     for (const line of [...outs, ...errs]) {
-      expect(line).not.toMatch(/[-]/);
+      const unsafe = [...line].filter((c) => {
+        const n = c.charCodeAt(0);
+        return n === 0x1b || n === 0x07 || (n >= 0x80 && n <= 0x9f);
+      });
+      expect(unsafe).toEqual([]);
     }
     expect(errs[0]).toContain("no-role");
   });
