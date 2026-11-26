@@ -77,7 +77,9 @@ describe("relay and peer messaging limits", () => {
 });
 
 describe("bridge requests: exactly the reviewed set (no approval path)", () => {
-  const KNOWN = ["history", "search", "send", "startDaemon", "ping", "shutdown"];
+  // "answer" stores the owner's answer to a decision (src/mail) and mails it to the role as peer text
+  // marked unverified; it answers no permission prompt and approves nothing in any session.
+  const KNOWN = ["history", "search", "send", "answer", "startDaemon", "ping", "shutdown"];
 
   test("the Request union names only the known types", () => {
     const src = read("src/bridge/protocol.ts");
