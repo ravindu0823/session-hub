@@ -442,6 +442,20 @@ describe("review fixes", () => {
     expect(errs[0]).toContain("no-role");
   });
 
+  test("a DEL character still arrives byte for byte in JSON output", async () => {
+    files.set("del.txt", "a\u007fb");
+    await run("mail", [...SEND.slice(0, -1), "del.txt"], ALPHA);
+    const r = await run("mail", ["inbox", "--json"], BETA);
+    expect(json(r.out[0]).body).toBe("a\u007fb");
+  });
+
+  test("a newline in a stored name never splits an output line", async () => {
+    open().upsertSession(session("s-nl", { name: "bad\nname here" }));
+    const r = await run("mail", ["inbox"], { CLAUDE_CODE_SESSION_ID: "s-nl" });
+    expect(r.err).toHaveLength(1);
+    expect(r.err[0]).not.toContain("\n");
+  });
+
   test("mail taken again after its session ended is marked redelivered", async () => {
     await run("mail", SEND, ALPHA);
     open().mail().claim("beta", "s-beta", clock);

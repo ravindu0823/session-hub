@@ -146,8 +146,8 @@ function numberOpt(p: Parsed, name: string, fallback: number, max: number): numb
 
 const iso = (ms: number | null): string | null => (ms === null ? null : new Date(ms).toISOString());
 
-/** C1 controls, line and paragraph separators, bidi embeddings, overrides and isolates. */
-const UNSAFE_IN_JSON = /[\u0080-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
+/** DEL, C1 controls, line and paragraph separators, bidi embeddings, overrides and isolates. */
+const UNSAFE_IN_JSON = /[\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 
 /** JSON with C1 controls, bidi controls and line separators escaped, so no byte can steer a terminal. */
 function jsonLine(v: unknown): string {
@@ -590,21 +590,23 @@ export async function runMailCli(
   args: readonly string[],
   deps: MailCliDeps,
 ): Promise<number> {
-  // hub.db is writable by any process of the user: every printed line is made terminal-safe here.
-  // JSON lines are unchanged by it (jsonLine already escapes every control and bidi character).
+  // hub.db is writable by any process of the user: every printed line is made terminal-safe here,
+  // and a newline inside a stored value cannot start a forged line. JSON lines are unchanged by it
+  // (jsonLine escapes DEL and every control, separator and bidi character).
+  const safe = (line: string) => cleanText(line).replaceAll("\n", " ");
   const d: MailCliDeps = {
     ...deps,
-    out: (line) => deps.out(cleanText(line)),
-    err: (line) => deps.err(cleanText(line)),
+    out: (line) => deps.out(safe(line)),
+    err: (line) => deps.err(safe(line)),
   };
   const label = `hub ${cmd}`;
   const run = COMMANDS[cmd];
   if (run === undefined) {
-    d.err(MAIL_USAGE);
+    deps.err(MAIL_USAGE);
     return 2;
   }
   if (args[0] === "--help" || args[0] === "-h") {
-    d.out(MAIL_USAGE);
+    deps.out(MAIL_USAGE);
     return 0;
   }
   let store: Store | null = null;
@@ -631,7 +633,7 @@ export async function runMailCli(
     return await run(ctx, args);
   } catch (e) {
     if (e instanceof UsageError) {
-      d.err(MAIL_USAGE);
+      deps.err(MAIL_USAGE);
       return 2;
     }
     if (
