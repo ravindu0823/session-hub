@@ -914,3 +914,139 @@ describe("lifecycle and input", () => {
     ]);
   });
 });
+
+describe("answer", () => {
+  function ask(role = "web"): void {
+    other.mail().createDecision({
+      role,
+      question: "Ship?",
+      options: ["yes", "no"],
+      recommendation: "yes",
+      fromSession: null,
+      createdAt: 1,
+    });
+  }
+
+  test("stores the owner's answer, mails it to the role and sends a new snapshot", async () => {
+    ask();
+    start();
+    await flush();
+    const before = snaps().length;
+    await request('{"id":3,"type":"answer","decisionId":"D-0001","text":"yes"}');
+    expect(replies()[0]).toMatchObject({
+      id: 3,
+      ok: true,
+      result: { result: "answered", role: "web" },
+    });
+    const d = other.mail().getDecision("D-0001");
+    expect(d?.answer).toBe("yes");
+    expect(d?.answeredVia).toBe("tray");
+    expect(other.mail().inbox("web")[0]?.body).toBe(
+      "D-0001 answered: yes (recorded via tray, outside Claude Code; not proof of who sent it)",
+    );
+    await clock.advance(POLL_MS);
+    expect(snaps().length).toBeGreaterThan(before);
+    const last = snaps().at(-1) as unknown as {
+      snapshot: { mail: { decisions: { id: string; state: string }[] } };
+    };
+    expect(last.snapshot.mail.decisions[0]).toMatchObject({ id: "D-0001", state: "answered" });
+  });
+
+  test("a different second answer replies conflict and changes nothing", async () => {
+    ask();
+    other.mail().answerDecision("D-0001", "yes", "cli", 2);
+    start();
+    await flush();
+    await request('{"id":4,"type":"answer","decisionId":"D-0001","text":"no"}');
+    expect(replies()[0]).toMatchObject({ id: 4, ok: true, result: { result: "conflict" } });
+    expect(other.mail().getDecision("D-0001")?.answer).toBe("yes");
+    await request('{"id":5,"type":"answer","decisionId":"D-0001","text":"no","replace":true}');
+    expect(replies()[1]).toMatchObject({ id: 5, ok: true, result: { result: "replaced" } });
+  });
+
+  test("a refused answer replies with the refusal's reason", async () => {
+    ask();
+    start();
+    await flush();
+    await request('{"id":6,"type":"answer","decisionId":"D-0001","text":"  "}');
+    expect(replies()[0]).toMatchObject({ id: 6, ok: false, error: { code: "empty-body" } });
+  });
+
+  test("inside a Claude Code session the bridge refuses answers and stores nothing", async () => {
+    ask();
+    start({ insideSession: () => true });
+    await flush();
+    await request('{"id":10,"type":"answer","decisionId":"D-0001","text":"yes"}');
+    expect(replies()[0]).toMatchObject({ id: 10, ok: false, error: { code: "not-owner" } });
+    expect(other.mail().getDecision("D-0001")?.state).toBe("open");
+    expect(other.mail().inbox("web")).toEqual([]);
+  });
+
+  test("an answer that looks like a secret is refused and nothing is stored", async () => {
+    ask();
+    start();
+    await flush();
+    await request(
+      '{"id":11,"type":"answer","decisionId":"D-0001","text":"token ghp_abcdefghijklmnopqrstuvwxyz0123456789"}',
+    );
+    expect(replies()[0]).toMatchObject({ id: 11, ok: false, error: { code: "looks-secret" } });
+    expect(other.mail().getDecision("D-0001")?.answer).toBeNull();
+    expect(other.mail().inbox("web")).toEqual([]);
+  });
+
+  test("a store failure inside the answer replies store-error and rolls the answer back", async () => {
+    ask();
+    const mail = store.mail();
+    mail.insert = () => {
+      throw new Error("database is locked");
+    };
+    start();
+    await flush();
+    await request('{"id":12,"type":"answer","decisionId":"D-0001","text":"yes"}');
+    expect(replies()[0]).toMatchObject({ id: 12, ok: false, error: { code: "store-error" } });
+    expect(other.mail().getDecision("D-0001")).toMatchObject({ state: "open", answer: null });
+  });
+
+  test("bad answer requests are bad-request", async () => {
+    start();
+    await flush();
+    await request('{"id":7,"type":"answer","decisionId":"D-0001"}');
+    await request('{"id":8,"type":"answer","decisionId":"D-0001","text":"y","replace":"x"}');
+    expect(replies().map((r) => (r as { error?: { code: string } }).error?.code)).toEqual([
+      "bad-request",
+      "bad-request",
+    ]);
+  });
+
+  test("before the index exists the answer is refused with no-store", async () => {
+    start({ store: () => null });
+    await flush();
+    await request('{"id":9,"type":"answer","decisionId":"D-0001","text":"yes"}');
+    expect(replies()[0]).toMatchObject({ id: 9, ok: false, error: { code: "no-store" } });
+  });
+
+  test("the snapshot uses the roles file the bridge reads", async () => {
+    other.upsertSession(session({ sessionId: "L", name: "web-2" }));
+    other.mail().insert({
+      thread: "T",
+      fromRole: "api",
+      fromSession: null,
+      toRole: "web",
+      kind: "task",
+      body: "b",
+      evidence: null,
+      createdAt: 1,
+      expiresAt: 9e12,
+    });
+    start({
+      roles: () => ({
+        roles: [{ role: "web", profile: null, sessions: ["web-*"] }],
+        expiryMs: 1,
+        ackTimeoutMs: 1,
+      }),
+    });
+    await flush();
+    const s = snaps().at(-1) as unknown as { snapshot: { mail: { waitingRoles: unknown[] } } };
+    expect(s.snapshot.mail.waitingRoles).toEqual([]);
+  });
+});

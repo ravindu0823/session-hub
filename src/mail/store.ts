@@ -276,6 +276,24 @@ export class MailStore {
     return new Map(rows.map((r) => [r.to_role, r.n]));
   }
 
+  /** Delivered mail still unacknowledged after the sender was told about it. */
+  countFlagged(): number {
+    const r = this.db
+      .query("SELECT COUNT(*) AS n FROM mail WHERE state = 'delivered' AND flagged_at IS NOT NULL")
+      .get() as { n: number };
+    return r.n;
+  }
+
+  /** Open (queued or delivered) mail to a role. */
+  countOpenTo(toRole: string): number {
+    const r = this.db
+      .query(
+        "SELECT COUNT(*) AS n FROM mail WHERE to_role = ? AND state IN ('queued', 'delivered')",
+      )
+      .get(toRole) as { n: number };
+    return r.n;
+  }
+
   // ---- upkeep (the daemon) ----
 
   /** Queued mail past its expiry; returns the rows that expired now. */

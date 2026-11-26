@@ -1,4 +1,7 @@
 import { STRAY_WARN_MS } from "../config";
+import { OWNER_ROLE, parseRolesConfig, type RolesConfig } from "../mail/roles";
+import { liveSessionsByRole } from "../mail/service";
+import type { DecisionRow } from "../mail/store";
 import type { SessionView, Store } from "../store/db";
 import { cleanText } from "../tui/sanitize";
 
@@ -17,6 +20,74 @@ export interface HubSnapshot {
     relayStrayCount: number;
   };
   totals: { waitingItems: number; needsApproval: number; live: number };
+  mail: MailSummary;
+}
+
+/** A decision as the panes show it: every string cleaned, the conflicts counted. */
+export interface DecisionView {
+  id: string;
+  role: string;
+  state: DecisionRow["state"];
+  question: string;
+  options: string[];
+  recommendation: string | null;
+  answer: string | null;
+  answeredAt: number | null;
+  answeredVia: string | null;
+  /** Answers recorded but not applied (a different second answer) or replaced. */
+  conflicts: number;
+  askedAt: number;
+}
+
+export interface MailSummary {
+  /** Open decisions oldest first, then answered ones newest first; closed ones are left out. */
+  decisions: DecisionView[];
+  /** Roles with queued mail and no live session: start a session of that role to deliver it. */
+  waitingRoles: { role: string; queued: number }[];
+  /** Delivered mail still unacknowledged after its sender was told. */
+  flagged: number;
+  /** Open mail addressed to the owner. */
+  ownerOpen: number;
+}
+
+/** Decisions shown at most; older answered ones stay in the index until retention. */
+const MAX_DECISIONS = 100;
+
+function decisionView(d: DecisionRow): DecisionView {
+  return {
+    id: cleanText(d.id),
+    role: cleanText(d.role),
+    state: d.state,
+    question: cleanText(d.question),
+    options: d.options.map(cleanText),
+    recommendation: d.recommendation === null ? null : cleanText(d.recommendation),
+    answer: d.answer === null ? null : cleanText(d.answer),
+    answeredAt: d.answeredAt,
+    answeredVia: d.answeredVia === null ? null : cleanText(d.answeredVia),
+    conflicts: d.conflicts.length,
+    askedAt: d.createdAt,
+  };
+}
+
+/** Mail and decisions for the panes. */
+export function readMailSummary(store: Store, roles: RolesConfig): MailSummary {
+  const mail = store.mail();
+  const answered = mail
+    .listDecisions({ state: "answered" })
+    .sort((a, b) => (b.answeredAt ?? 0) - (a.answeredAt ?? 0) || b.seq - a.seq);
+  const decisions = [...mail.listDecisions({ state: "open" }), ...answered]
+    .slice(0, MAX_DECISIONS)
+    .map(decisionView);
+  const live = liveSessionsByRole(store, roles);
+  const waitingRoles = [...mail.queuedByRole()]
+    .filter(([role]) => role !== OWNER_ROLE && !live.has(role))
+    .map(([role, queued]) => ({ role: cleanText(role), queued }));
+  return {
+    decisions,
+    waitingRoles,
+    flagged: mail.countFlagged(),
+    ownerOpen: mail.countOpenTo(OWNER_ROLE),
+  };
 }
 
 /** Every string the panes print from a session goes through cleanText here, once per read. */
@@ -48,7 +119,13 @@ export function cleanSession(s: SessionView): SessionView {
 /** Read-only snapshot of everything the TUI and the bridge show outside History and Send. */
 export function readSnapshot(
   store: Store,
-  opts: { daemonRunning: boolean; knownProfiles: readonly string[]; now?: number },
+  opts: {
+    daemonRunning: boolean;
+    knownProfiles: readonly string[];
+    now?: number;
+    /** The local roles file, parsed; without it a session's role is its name. */
+    roles?: RolesConfig;
+  },
 ): HubSnapshot {
   const sessions = store.listSessions().map(cleanSession);
   const profiles = new Set<string>([...opts.knownProfiles, ...sessions.map((s) => s.profile)]);
@@ -78,5 +155,6 @@ export function readSnapshot(
       needsApproval: live.filter((s) => s.state === "waiting").length,
       live: live.length,
     },
+    mail: readMailSummary(store, opts.roles ?? parseRolesConfig(null)),
   };
 }

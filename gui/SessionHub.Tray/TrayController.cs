@@ -65,7 +65,10 @@ internal sealed class TrayController : IPanelHost, IWindowHost
             UpdateIcon();
             CommandManager.InvalidateRequerySuggested();
         });
-        Panel = new PanelViewModel(Hub);
+        // Made here, started later (Start): the decision list needs its RequestAsync.
+        client = new BridgeClient(factory, new DispatcherSynchronizationContext(app.Dispatcher));
+        Decisions = new DecisionsViewModel(client.RequestAsync);
+        Panel = new PanelViewModel(Hub, Decisions);
         Panel.ExchangeWanted += card => _ = FetchExchangeAsync(card);
         Window = new WindowViewModel(Panel);
 
@@ -82,7 +85,6 @@ internal sealed class TrayController : IPanelHost, IWindowHost
             if (Interlocked.Exchange(ref saveFailing, 0) == 1) app.Dispatcher.BeginInvoke(() => Panel.SetSaveFailed(false));
         };
 
-        client = new BridgeClient(factory, new DispatcherSynchronizationContext(app.Dispatcher));
         Sends = new SendCoordinator(client.RequestAsync);
         client.Snapshot += OnSnapshot;
         client.SendChanged += u => Guard("send-event", () =>
@@ -122,6 +124,9 @@ internal sealed class TrayController : IPanelHost, IWindowHost
     public HubViewModel Hub { get; }
 
     public PanelViewModel Panel { get; }
+
+    /// <summary>The owner's decisions, shown in the panel (Home and Waiting tabs).</summary>
+    public DecisionsViewModel Decisions { get; }
 
     /// <summary>The window's state; it outlives the window itself (closing drops only the view).</summary>
     public WindowViewModel Window { get; }
@@ -348,7 +353,9 @@ internal sealed class TrayController : IPanelHost, IWindowHost
     private void UpdateIcon()
     {
         var health = client.Health ?? new BridgeHealth.Restarting(0, TimeSpan.Zero);
-        var totals = Hub.EffectiveTotals;
+        // Open decisions wait on the owner too: they count with the waiting items.
+        var effective = Hub.EffectiveTotals;
+        var totals = effective with { WaitingItems = effective.WaitingItems + Decisions.OpenCount };
         var state = IconState.From(Hub.Meta, totals, health, Hub.HasSnapshot);
         if (state != shownIcon || trayIconSize != shownIconSize)
         {

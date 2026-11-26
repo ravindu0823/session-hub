@@ -67,6 +67,16 @@ internal sealed partial class PanelWindow : Window
             }),
             (_, e) => e.CanExecute = CanSendItem(e.Parameter)));
 
+        CommandBindings.Add(new CommandBinding(
+            PanelCommands.AnswerDecision,
+            (_, e) => On<DecisionCardViewModel>(e, c => _ = AnswerAsync(c, replace: false)),
+            (_, e) => e.CanExecute = vm.Decisions is not null && e.Parameter is DecisionCardViewModel { CanAnswer: true }));
+        CommandBindings.Add(new CommandBinding(
+            PanelCommands.ReplaceDecision,
+            (_, e) => On<DecisionCardViewModel>(e, c => _ = AnswerAsync(c, replace: true)),
+            (_, e) => e.CanExecute = vm.Decisions is not null
+                && e.Parameter is DecisionCardViewModel { CanAnswer: true, CanReplace: true }));
+
         vm.PropertyChanged += OnViewModelChanged;
         PreviewKeyDown += OnKey;
         // A deactivation in the first 500 ms after showing comes from the activation itself (the
@@ -177,6 +187,22 @@ internal sealed partial class PanelWindow : Window
     /// <summary>One item's Send: its box filled and within the limit, and its card free to send (as the main button).</summary>
     private bool CanSendItem(object? parameter) =>
         parameter is AnswerItemViewModel { CanSend: true } item && vm.CanSend && vm.Card(item.SessionId) is { IsRequesting: false };
+
+    // One request through the bridge, never retried; the buttons re-check once it settles.
+    private async System.Threading.Tasks.Task AnswerAsync(DecisionCardViewModel card, bool replace)
+    {
+        if (vm.Decisions is not { } decisions) return;
+        try
+        {
+            await decisions.AnswerAsync(card, replace);
+        }
+        catch (Exception e)
+        {
+            TrayLog.Error("decision-answer", e);
+        }
+
+        CommandManager.InvalidateRequerySuggested();
+    }
 
     private static void On<T>(ExecutedRoutedEventArgs e, Action<T> action)
         where T : class

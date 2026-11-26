@@ -44,10 +44,12 @@ public sealed class PanelViewModel : ObservableObject
     private string footerText = "";
     private string footerWarning = "";
 
-    public PanelViewModel(HubViewModel hub)
+    /// <param name="decisions">The owner's decision list; null shows none (render checks, older tests).</param>
+    public PanelViewModel(HubViewModel hub, DecisionsViewModel? decisions = null)
     {
         ArgumentNullException.ThrowIfNull(hub);
         Hub = hub;
+        Decisions = decisions;
         hub.DismissedChanged += OnDismissedChanged;
     }
 
@@ -55,6 +57,12 @@ public sealed class PanelViewModel : ObservableObject
     public event Action<CardViewModel>? ExchangeWanted;
 
     public HubViewModel Hub { get; }
+
+    /// <summary>Decisions and mail notices, shown on the Home and Waiting tabs.</summary>
+    public DecisionsViewModel? Decisions { get; }
+
+    /// <summary>The decision section is visible: Home or Waiting tab, with a card or a notice.</summary>
+    public bool ShowDecisions => (tab is PanelTab.Home or PanelTab.Waiting) && Decisions is { HasAny: true };
 
     /// <summary>The cards of the current tab (unused on <see cref="PanelTab.Send"/>).</summary>
     public ObservableCollection<CardViewModel> Items { get; } = [];
@@ -72,6 +80,7 @@ public sealed class PanelViewModel : ObservableObject
             Raise(nameof(ShowSearch));
             Raise(nameof(ShowFilters));
             Raise(nameof(IsSendTab));
+            Raise(nameof(ShowDecisions));
         }
     }
 
@@ -109,17 +118,19 @@ public sealed class PanelViewModel : ObservableObject
     {
         PanelTab.Home => "What needs you right now, across both profiles.",
         PanelTab.Sessions => "Every live Claude Code session. Click one for its status.",
-        PanelTab.Waiting => "Questions and permission prompts waiting on you.",
+        PanelTab.Waiting => "Questions, permission prompts and decisions waiting on you.",
         _ => "Send an info-only message to a session.",
     };
 
-    /// <summary>Badge of the Waiting tab: open items (dismissed ones left out) plus open approvals.</summary>
+    /// <summary>
+    /// Badge of the Waiting tab: open items (dismissed ones left out), open approvals and open decisions.
+    /// </summary>
     public int WaitingTotal
     {
         get
         {
             var t = Hub.EffectiveTotals;
-            return t.WaitingItems + t.NeedsApproval;
+            return t.WaitingItems + t.NeedsApproval + (Decisions?.OpenCount ?? 0);
         }
     }
 
@@ -236,6 +247,7 @@ public sealed class PanelViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(snapshot);
         now = at;
         Hub.Apply(snapshot);
+        Decisions?.Apply(snapshot.Mail);
         var wasSnapshot = hasSnapshot;
         hasSnapshot = true;
 
@@ -332,7 +344,8 @@ public sealed class PanelViewModel : ObservableObject
         StableList.Sync(SendTargets, live, reorder);
         if (sendTarget is null || !live.Contains(sendTarget)) SendTarget = live.FirstOrDefault();
 
-        IsEmpty = tab == PanelTab.Send ? live.Count == 0 : Items.Count == 0;
+        IsEmpty = tab == PanelTab.Send ? live.Count == 0 : Items.Count == 0 && !ShowDecisions;
+        Raise(nameof(ShowDecisions));
         Raise(nameof(EmptyTitle));
         Raise(nameof(EmptyText));
         Summary = tab switch

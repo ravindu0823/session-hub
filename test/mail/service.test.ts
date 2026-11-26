@@ -6,12 +6,14 @@ import { parseRolesConfig, type RolesConfig } from "../../src/mail/roles";
 import {
   answerAndNotify,
   type Caller,
+  insideClaudeCode,
   MAX_MAIL_PER_MINUTE,
   MailRefused,
   mailUpkeep,
   OPEN_DECISION_MAX_MS,
   resolveCaller,
   sendMail,
+  withoutSessionEnv,
 } from "../../src/mail/service";
 import { type SessionRow, Store } from "../../src/store/db";
 
@@ -362,5 +364,22 @@ describe("mailUpkeep", () => {
       ["hub", "fyi", "D-0001", "D-0001 closed: no answer within 30 days."],
     ]);
     expect(mailUpkeep(store, cfg, now).closed).toBe(0);
+  });
+});
+
+describe("withoutSessionEnv", () => {
+  test("drops CLAUDECODE and CLAUDE_CODE_* in any case and keeps everything else", () => {
+    const env = {
+      PATH: "p",
+      CLAUDECODE: "1",
+      CLAUDE_CODE_SESSION_ID: "s",
+      claude_code_entrypoint: "cli",
+      CLAUDE_CONFIG_DIR: "c",
+      LOCALAPPDATA: "l",
+    };
+    const out = withoutSessionEnv(env);
+    expect(out).toEqual({ PATH: "p", CLAUDE_CONFIG_DIR: "c", LOCALAPPDATA: "l" });
+    expect(insideClaudeCode(env)).toBe(true);
+    expect(insideClaudeCode(out)).toBe(false);
   });
 });

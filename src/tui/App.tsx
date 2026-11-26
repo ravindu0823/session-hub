@@ -1,8 +1,10 @@
 import { Box, type Key, Text, useApp, useInput, usePaste, useWindowSize } from "ink";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProfileId } from "../config";
+import type { RolesConfig } from "../mail/roles";
 import type { SessionView, Store } from "../store/db";
-import { readSnapshot } from "../view/snapshot";
+import { type MailSummary, readSnapshot } from "../view/snapshot";
+import { DecisionsPane } from "./DecisionsPane";
 import { sessionLabel } from "./format";
 import { HistoryPane } from "./HistoryPane";
 import type { PaneKeys, Register } from "./keys";
@@ -18,9 +20,11 @@ export interface AppProps {
   buildMessage: (text: string) => string;
   now: () => number;
   refreshMs?: number;
+  /** The local roles file, parsed; read on every refresh (default: none, a session's role is its name). */
+  roles?: () => RolesConfig;
 }
 
-type Tab = "status" | "history" | "send";
+type Tab = "status" | "history" | "send" | "decisions";
 
 const KNOWN_PROFILES: readonly ProfileId[] = ["claude", "claude-personal"];
 const TOAST_MS = 3000;
@@ -28,6 +32,7 @@ const TOAST_MS = 3000;
 interface Snapshot {
   sessions: SessionView[];
   meta: HubMeta;
+  mail: MailSummary;
 }
 
 function message(e: unknown): string {
@@ -35,7 +40,7 @@ function message(e: unknown): string {
 }
 
 export function App(props: AppProps) {
-  const { store, focus } = props;
+  const { store, focus, roles } = props;
   const refreshMs = props.refreshMs ?? 1000;
   const { exit } = useApp();
   const { columns, rows } = useWindowSize();
@@ -82,14 +87,20 @@ export function App(props: AppProps) {
 
   const refresh = useCallback(() => {
     try {
-      setSnap(readSnapshot(store, { daemonRunning: true, knownProfiles: KNOWN_PROFILES }));
+      setSnap(
+        readSnapshot(store, {
+          daemonRunning: true,
+          knownProfiles: KNOWN_PROFILES,
+          ...(roles === undefined ? {} : { roles: roles() }),
+        }),
+      );
       setStoreError(null);
       setPaneError(null);
     } catch (e) {
       setStoreError(message(e));
     }
     setTick((t) => t + 1);
-  }, [store]);
+  }, [store, roles]);
 
   // Reads run in timers, never during render; the first frame shows "loading".
   useEffect(() => {
@@ -152,6 +163,7 @@ export function App(props: AppProps) {
     else if (input === "1") setTab("status");
     else if (input === "2") setTab("history");
     else if (input === "3") setTab("send");
+    else if (input === "4") setTab("decisions");
     else if (input === "/") {
       setTab("history");
       const hp = panes.current.history;
@@ -193,15 +205,23 @@ export function App(props: AppProps) {
   const rightW = Math.max(10, columns - leftW - 1);
   const error = storeError ?? paneError;
 
+  const openDecisions = snap?.mail.decisions.filter((d) => d.state === "open").length ?? 0;
+  const decisionsLabel = openDecisions > 0 ? `Decisions (${openDecisions})` : "Decisions";
   const tabLabel = (t: Tab, n: string, label: string) => (
     <Text inverse={tab === t} bold={tab === t}>{` ${n} ${label} `}</Text>
   );
 
+  const decisionsBox =
+    snap === null ? null : (
+      <Box display={tab === "decisions" ? "flex" : "none"}>
+        <DecisionsPane mail={snap.mail} width={rightW} height={bodyH} />
+      </Box>
+    );
   let pane: ReactNode;
   if (snap === null) {
     pane = <Text dimColor>{storeError ? "store unavailable" : "loading..."}</Text>;
   } else if (selected === null) {
-    pane = <Text dimColor>no sessions yet</Text>;
+    pane = tab === "decisions" ? decisionsBox : <Text dimColor>no sessions yet</Text>;
   } else {
     const key = selected.sessionId;
     pane = (
@@ -247,6 +267,7 @@ export function App(props: AppProps) {
             onError={onPaneError}
           />
         </Box>
+        {decisionsBox}
       </>
     );
   }
@@ -269,7 +290,7 @@ export function App(props: AppProps) {
   } else {
     footer = (
       <Text dimColor wrap="truncate-end">
-        ↑↓ select · 1/2/3 pane · / search · j jump · r refresh · q quit · times local
+        ↑↓ select · 1-4 pane · / search · j jump · r refresh · q quit · times local
       </Text>
     );
   }
@@ -282,6 +303,7 @@ export function App(props: AppProps) {
           {tabLabel("status", "1", "Status")}
           {tabLabel("history", "2", "History")}
           {tabLabel("send", "3", "Send")}
+          {tabLabel("decisions", "4", decisionsLabel)}
           <Text dimColor>{selected ? `  ${sessionLabel(selected)}` : ""}</Text>
         </Text>
       </Box>

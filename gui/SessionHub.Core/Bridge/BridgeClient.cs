@@ -121,6 +121,7 @@ public sealed class BridgeClient : IAsyncDisposable
             SendRequest r => r with { Id = id },
             StartDaemonRequest r => r with { Id = id },
             PingRequest r => r with { Id = id },
+            AnswerRequest r => r with { Id = id },
             _ => null,
         };
         if (withId is null) return Fail(id, "bad-request", "request type has no reply");

@@ -100,3 +100,113 @@ describe("readSnapshot", () => {
     expect(at(now)).toBe(0);
   });
 });
+
+describe("mail in the snapshot", () => {
+  const ask = (role: string, question: string, at: number) =>
+    store.mail().createDecision({
+      role,
+      question,
+      options: ["yes", "no"],
+      recommendation: "yes",
+      fromSession: null,
+      createdAt: at,
+    });
+  const queue = (to: string, over: { fromRole?: string } = {}) =>
+    store.mail().insert({
+      thread: "T",
+      fromRole: over.fromRole ?? "web",
+      fromSession: null,
+      toRole: to,
+      kind: "task",
+      body: "b",
+      evidence: null,
+      createdAt: 1,
+      expiresAt: 9e12,
+    });
+
+  test("with no mail the section is empty", () => {
+    expect(readSnapshot(store, OPTS).mail).toEqual({
+      decisions: [],
+      waitingRoles: [],
+      flagged: 0,
+      ownerOpen: 0,
+    });
+  });
+
+  test("open decisions first (oldest first), then answered ones (newest first); closed ones are left out", () => {
+    ask("web", "first?", 1);
+    ask("web", "second?", 2);
+    ask("api", "third?\u001b[2J", 3);
+    ask("api", "fourth?", 4);
+    store.mail().answerDecision("D-0001", "yes", "tray", 10);
+    store.mail().answerDecision("D-0002", "no", "cli", 20);
+    store.mail().closeDecision("D-0004", "api", 30);
+    const d = readSnapshot(store, OPTS).mail.decisions;
+    expect(d.map((x) => x.id)).toEqual(["D-0003", "D-0002", "D-0001"]);
+    expect(d[0]).toEqual({
+      id: "D-0003",
+      role: "api",
+      state: "open",
+      question: "third?",
+      options: ["yes", "no"],
+      recommendation: "yes",
+      answer: null,
+      answeredAt: null,
+      answeredVia: null,
+      conflicts: 0,
+      askedAt: 3,
+    });
+    expect(d[1]).toMatchObject({ answer: "no", answeredVia: "cli", answeredAt: 20 });
+  });
+
+  test("bidi overrides and isolates in a decision's strings are stripped", () => {
+    store.mail().createDecision({
+      role: "web",
+      question: "Ship \u202Eevil\u2066?",
+      options: ["y\u202Des"],
+      recommendation: "y\u2067es",
+      fromSession: null,
+      createdAt: 1,
+    });
+    store.mail().answerDecision("D-0001", "o\u202Ek", "tr\u2069ay", 2);
+    const d = readSnapshot(store, OPTS).mail.decisions[0];
+    expect(d).toMatchObject({
+      question: "Ship evil?",
+      options: ["yes"],
+      recommendation: "yes",
+      answer: "ok",
+      answeredVia: "tray",
+    });
+    const all = JSON.stringify(d);
+    for (const c of [0x202d, 0x202e, 0x2066, 0x2067, 0x2069]) {
+      expect(all.includes(String.fromCharCode(c))).toBe(false);
+    }
+  });
+
+  test("a conflicting second answer shows in the conflict count", () => {
+    ask("web", "q?", 1);
+    store.mail().answerDecision("D-0001", "yes", "tray", 2);
+    store.mail().answerDecision("D-0001", "no", "cli", 3);
+    expect(readSnapshot(store, OPTS).mail.decisions[0]?.conflicts).toBe(1);
+  });
+
+  test("roles with queued mail and no live session are listed to start one", () => {
+    store.upsertSession(session({ sessionId: "L", name: "api" }));
+    queue("api");
+    queue("docs");
+    queue("docs");
+    expect(readSnapshot(store, OPTS).mail.waitingRoles).toEqual([{ role: "docs", queued: 2 }]);
+  });
+
+  test("flagged and owner mail are counted", () => {
+    store.upsertSession(session({ sessionId: "L", name: "api" }));
+    queue("api");
+    queue("owner");
+    queue("owner");
+    store.mail().claim("api", "L", 5);
+    store.mail().flagUnacked(10_000_000, 1);
+    const m = readSnapshot(store, OPTS).mail;
+    expect(m.flagged).toBe(1);
+    expect(m.ownerOpen).toBe(2);
+  });
+});

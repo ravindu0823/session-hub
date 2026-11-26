@@ -54,7 +54,42 @@ public sealed record Meta(
 
 public sealed record Totals([property: JsonRequired] int WaitingItems, [property: JsonRequired] int NeedsApproval, [property: JsonRequired] int Live);
 
-public sealed record HubSnapshot([property: JsonRequired] IReadOnlyList<SessionView> Sessions, [property: JsonRequired] Meta Meta, [property: JsonRequired] Totals Totals);
+/// <summary>
+/// One owner decision (`hub ask`). <paramref name="Conflicts"/>: answers that were not applied, or that a
+/// replace answer took the place of. Strings were cleaned by the bridge.
+/// </summary>
+public sealed record DecisionView(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Role,
+    [property: JsonRequired] string State,
+    [property: JsonRequired] string Question,
+    [property: JsonRequired] IReadOnlyList<string> Options,
+    string? Recommendation,
+    string? Answer,
+    long? AnsweredAt,
+    string? AnsweredVia,
+    int Conflicts,
+    long AskedAt);
+
+/// <summary>A role with queued mail and no live session.</summary>
+public sealed record WaitingRole([property: JsonRequired] string Role, int Queued);
+
+/// <summary>
+/// Mail and decisions: open decisions first, then answered ones. <paramref name="Flagged"/>: delivered
+/// mail with no ack after the timeout. <paramref name="OwnerOpen"/>: open mail addressed to the owner.
+/// </summary>
+public sealed record MailSummary(
+    [property: JsonRequired] IReadOnlyList<DecisionView> Decisions,
+    [property: JsonRequired] IReadOnlyList<WaitingRole> WaitingRoles,
+    int Flagged,
+    int OwnerOpen);
+
+/// <summary><paramref name="Mail"/> is null when an older bridge leaves it out.</summary>
+public sealed record HubSnapshot(
+    [property: JsonRequired] IReadOnlyList<SessionView> Sessions,
+    [property: JsonRequired] Meta Meta,
+    [property: JsonRequired] Totals Totals,
+    MailSummary? Mail = null);
 
 public sealed record MessageRow(
     string Uuid,
@@ -81,6 +116,12 @@ public sealed record SendResult(int SendId, string State);
 
 public sealed record StartDaemonResult(bool Running);
 
+/// <summary>
+/// Result of an answer: <c>answered</c>, <c>replaced</c>, <c>same</c>, <c>conflict</c>, <c>closed</c> or
+/// <c>not-found</c>; <paramref name="Role"/> is the decision's role (null when not found).
+/// </summary>
+public sealed record AnswerResult([property: JsonRequired] string Result, string? Role);
+
 // Events, bridge to tray.
 
 public abstract record BridgeEvent;
@@ -106,6 +147,7 @@ public sealed record Reply([property: JsonRequired] int Id, [property: JsonRequi
 [JsonDerivedType(typeof(SendRequest), "send")]
 [JsonDerivedType(typeof(StartDaemonRequest), "startDaemon")]
 [JsonDerivedType(typeof(PingRequest), "ping")]
+[JsonDerivedType(typeof(AnswerRequest), "answer")]
 [JsonDerivedType(typeof(ShutdownRequest), "shutdown")]
 public abstract record BridgeRequest;
 
@@ -121,3 +163,9 @@ public sealed record StartDaemonRequest(int Id) : BridgeRequest;
 public sealed record PingRequest(int Id) : BridgeRequest;
 
 public sealed record ShutdownRequest : BridgeRequest;
+
+/// <summary>
+/// The owner's answer to a decision. It is stored once and mailed to the decision's role; it answers no
+/// permission prompt. <paramref name="Replace"/> changes an answer already stored.
+/// </summary>
+public sealed record AnswerRequest(int Id, string DecisionId, string Text, bool? Replace = null) : BridgeRequest;
