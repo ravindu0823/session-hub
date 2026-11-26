@@ -30,6 +30,8 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
 
 ### Fixed
 
+- The daemon tests date their transcript fixtures from the test clock; fixed dates fell out of the
+  seven-day window and were purged, failing ten tests from 2026-11-20. (#ISSUE-DATES)
 - After `/compact`, the compaction summary and local command output were indexed as the owner's
   messages, so open waiting items could show as answered; they are no longer indexed, and an index
   update removes the ones already stored. (#20)
