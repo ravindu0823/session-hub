@@ -32,6 +32,8 @@ export type Request =
       override?: boolean;
       allowSecret?: boolean;
     }
+  /** The owner's answer to a decision (src/mail); `replace` changes an answer already stored. */
+  | { id: number; type: "answer"; decisionId: string; text: string; replace?: boolean }
   | { id: number; type: "startDaemon" }
   | { id: number; type: "ping" }
   | { type: "shutdown" };
@@ -74,7 +76,7 @@ export type BridgeEvent =
   | { type: "reply"; id: number; ok: true; result: unknown }
   | { type: "reply"; id: number; ok: false; error: ReplyError };
 
-const TYPES_WITH_ID = new Set(["history", "search", "send", "startDaemon", "ping"]);
+const TYPES_WITH_ID = new Set(["history", "search", "send", "answer", "startDaemon", "ping"]);
 
 const isId = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 const isLimit = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 1;
@@ -128,6 +130,13 @@ export function parseRequest(line: string): Request | ParseError {
       const req: Request = { id, type: "send", sessionId: o.sessionId, text: o.text };
       if (o.override !== undefined) req.override = o.override;
       if (o.allowSecret !== undefined) req.allowSecret = o.allowSecret;
+      return req;
+    }
+    case "answer": {
+      if (!isStr(o.decisionId) || !isStr(o.text)) return bad;
+      if (o.replace !== undefined && typeof o.replace !== "boolean") return bad;
+      const req: Request = { id, type: "answer", decisionId: o.decisionId, text: o.text };
+      if (o.replace !== undefined) req.replace = o.replace;
       return req;
     }
     case "startDaemon":
