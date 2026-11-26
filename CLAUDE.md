@@ -112,9 +112,10 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   `hub bridge` child of the tray read it. `hub mail`, `hub ask` and `hub answer` write only the mail and decision
   tables, and refuse an index at an older schema instead of upgrading it. No network, no services, no cloud. Deploy
   target: `hub install` on the owner's PC from a reviewed build; each release needs a passing Windows test report
-  (`scripts/test-windows-report.ps1`) and a passing `bun run relay-eval` in each profile (real relays to throwaway `sh-eval-*` background sessions; the report
-  script runs `relay-eval --check`, which fails until both profiles have a PASS report for the current relay command
-  and prompt, made with the installed Claude Code version, at most 30 days old).
+  (`scripts/test-windows-report.ps1`) and a passing `bun run relay-eval` in each profile (real relays to throwaway
+  `sh-eval-*` background sessions; the report script runs `relay-eval --check`, which fails until both profiles have a
+  PASS report for the current relay command and prompt, made with the installed Claude Code version, at most 30 days
+  old).
 
 ## Upgrade actions
 - .NET 10 LTS (SDK 10.0.404): supported to 2028-11-14. No action.
