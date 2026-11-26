@@ -169,8 +169,101 @@
                                Visibility="{Binding Summary, Converter={StaticResource EmptyToCollapsed}}"
                                TextTrimming="CharacterEllipsis" />
 
-                    <!-- Lists. -->
+                    <!-- Decisions (Home, Waiting) above the lists. -->
                     <Grid Grid.Row="7">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- The owner's decisions (hub ask) and notices about mail that waits for a role. An answer is
+                         stored once and mailed to the decision's role; it never answers a permission prompt. -->
+                    <ScrollViewer x:Name="DecisionsPane" Margin="10,0,10,8" MaxHeight="320" VerticalScrollBarVisibility="Auto"
+                                  DataContext="{Binding Decisions}"
+                                  Visibility="{Binding DataContext.ShowDecisions, ElementName=Frame, Converter={StaticResource Visible}}">
+                        <StackPanel>
+                            <ItemsControl ItemsSource="{Binding Notices}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,6" CornerRadius="10" Padding="10,8" BorderThickness="1"
+                                                Background="{DynamicResource AmberSoft}" BorderBrush="{DynamicResource AmberEdge}">
+                                            <TextBlock Text="{Binding}" FontSize="12.5" TextWrapping="Wrap" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding Items}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource PlainCard}" Margin="0,0,0,8">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Header}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Question}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Style="{StaticResource Note}" Margin="0,4,0,0" Text="{Binding OptionsText}"
+                                                           Visibility="{Binding OptionsText, Converter={StaticResource EmptyToCollapsed}}" />
+                                                <TextBlock Style="{StaticResource Note}" Margin="0,2,0,0" Text="{Binding RecommendationText}"
+                                                           Visibility="{Binding RecommendationText, Converter={StaticResource EmptyToCollapsed}}" />
+                                                <TextBlock Style="{StaticResource Note}" Margin="0,2,0,0" Text="{Binding AnswerText}"
+                                                           Visibility="{Binding AnswerText, Converter={StaticResource EmptyToCollapsed}}" />
+                                                <StackPanel Margin="0,8,0,0">
+                                                    <Border CornerRadius="10" Padding="10,6" BorderThickness="1" Background="{DynamicResource Surface}"
+                                                            BorderBrush="{DynamicResource Line}">
+                                                        <Grid>
+                                                            <TextBlock Text="Your answer…" Foreground="{DynamicResource Muted}" IsHitTestVisible="False"
+                                                                       VerticalAlignment="Top">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Draft}" Value="">
+                                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <TextBox Style="{StaticResource BareTextBox}" AcceptsReturn="True" TextWrapping="Wrap"
+                                                                     MaxHeight="96" VerticalScrollBarVisibility="Auto" MaxLength="20000"
+                                                                     AutomationProperties.Name="{Binding Id, StringFormat='Answer to {0}'}"
+                                                                     Text="{Binding Draft, UpdateSourceTrigger=PropertyChanged}" />
+                                                        </Grid>
+                                                    </Border>
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                        <Button Style="{StaticResource OutlineButton}" Margin="0,0,6,0" Content="Replace"
+                                                                Command="t:PanelCommands.ReplaceDecision" CommandParameter="{Binding}"
+                                                                ToolTip="Store your answer in place of the one already there"
+                                                                Visibility="{Binding CanReplace, Converter={StaticResource Visible}}"
+                                                                AutomationProperties.Name="{Binding Id, StringFormat='Replace the answer to {0}'}" />
+                                                        <Button Style="{StaticResource TinyPrimaryButton}" Content="Answer"
+                                                                Command="t:PanelCommands.AnswerDecision" CommandParameter="{Binding}"
+                                                                AutomationProperties.Name="{Binding Id, StringFormat='Answer {0}'}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Status}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                           Visibility="{Binding Status, Converter={StaticResource EmptyToCollapsed}}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{DynamicResource Text2}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource Red}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Style="{StaticResource Note}" Margin="4,0,4,4"
+                                       Text="Answers are mailed to the session's role. Approvals still happen in the session's own terminal." />
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Lists. -->
+                    <Grid Grid.Row="1">
                         <ItemsControl x:Name="HomeList" ItemsSource="{Binding Items}" Margin="10,0,10,10"
                                       VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                                       VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True"
@@ -247,6 +340,7 @@
                                 Visibility="Collapsed">
                             <TextBlock x:Name="NoticeText" TextWrapping="Wrap" />
                         </Border>
+                    </Grid>
                     </Grid>
 
                     <!-- Footer: a save warning when drafts cannot be written, then day and age, key hints, Quit. -->

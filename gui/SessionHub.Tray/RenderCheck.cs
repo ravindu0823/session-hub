@@ -17,7 +17,8 @@ namespace SessionHub.Tray;
 
 /// <summary>
 /// Hidden switch <c>--render-check &lt;dir&gt;</c>: renders the panel from the fixture snapshot to PNG
-/// (Sessions with a card open, Home, Send, daemon stopped) at 96, 144 and 192 DPI in both themes, a card
+/// (Sessions with a card open, Home, Send, daemon stopped, Waiting with the decision list) at 96, 144 and
+/// 192 DPI in both themes, a card
 /// with the answer form at 96 and 144 DPI,
 /// the window (Status tab) at 720, 1000 and 1400 DIP wide at the same DPIs and themes, the window's
 /// History, Send, answer-form and ended-session views at two sizes, the plain reply box, and the tray icon in every state at 16, 20,
@@ -45,7 +46,7 @@ internal static class RenderCheck
             foreach (var light in new[] { false, true })
             {
                 theme.Apply(light);
-                foreach (var scenario in new[] { "sessions", "home", "send", "stopped" })
+                foreach (var scenario in new[] { "sessions", "home", "send", "stopped", "decisions" })
                 {
                     foreach (var dpi in Dpis)
                     {
@@ -151,11 +152,24 @@ internal static class RenderCheck
 
     private static void Render(Application app, HubSnapshot snapshot, HistoryResult history, DateTimeOffset now, string scenario, int dpi, string file)
     {
-        var vm = new PanelViewModel(new HubViewModel());
+        // The decision list answers from a canned conflict reply: no bridge is started.
+        var decisions = scenario == "decisions"
+            ? new DecisionsViewModel((_, _) => Task.FromResult(new Reply(
+                1, true, System.Text.Json.JsonDocument.Parse("""{"result":"conflict","role":"gamma"}""").RootElement.Clone())))
+            : null;
+        var vm = new PanelViewModel(new HubViewModel(), decisions);
         vm.SetHealth(new BridgeHealth.Connected());
         vm.Apply(snapshot, now);
         switch (scenario)
         {
+            case "decisions" when decisions is not null:
+                vm.SelectTab(PanelTab.Waiting);
+                decisions.Items[0].Draft = "yes, after the two fixes";
+                var conflict = decisions.Items[^1];
+                conflict.Draft = "no";
+                // Completes at once: the reply is canned.
+                decisions.AnswerAsync(conflict, replace: false).GetAwaiter().GetResult();
+                break;
             case "home":
             case "stopped":
                 vm.SelectTab(PanelTab.Home);
