@@ -236,6 +236,22 @@ through `hub.db` byte for byte; no model retypes it.
 optional. `owner` (you, in a terminal outside Claude Code) and `hub` are reserved. `hub roles` lists every role with
 its live sessions and queued mail, and says which session to start for mail that is waiting.
 
+**Role catalogue (optional).** An entry can also say how a session of that role is started, for a launcher script
+that reads `hub roles --json` (the hub itself never starts sessions):
+
+| Field | Value |
+| --- | --- |
+| `folder`, `brief` | Absolute paths: where the session starts, and its start prompt or handover file. No `;`, `"` or control characters |
+| `model` | `opus`, `sonnet`, `haiku`, `fable` or a full `claude-*` id, optionally with `[1m]` |
+| `effort` | `low`, `medium`, `high`, `xhigh` or `max` |
+| `gateway` | `true` when the session runs through a team gateway |
+| `mcpServers`, `plugins`, `telegramChats` | Lists of names, shown only |
+| `questionPrefix` | Family prefix of the role's question IDs (`WEB` for `WEB-Q12`): `A-Z` and digits, unique |
+
+A top-level `"reservedPrefixes": ["OLD"]` keeps prefixes of families that have no entry. Format errors and a prefix
+used twice make the file invalid; `hub roles` lists softer problems per role (a folder or brief that does not exist, a
+chat that two roles list) under `problems`.
+
 **Send and receive** from a session's shell:
 
 | Command | What it does |

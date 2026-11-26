@@ -45,6 +45,19 @@ describe("matchesSessionPattern", () => {
   });
 });
 
+/** The catalogue fields of an entry that sets none of them. */
+const NO_CATALOGUE = {
+  folder: null,
+  brief: null,
+  model: null,
+  effort: null,
+  gateway: false,
+  mcpServers: [],
+  plugins: [],
+  telegramChats: [],
+  questionPrefix: null,
+};
+
 describe("parseRolesConfig", () => {
   test("a missing file gives no roles and the default timings", () => {
     const cfg = parseRolesConfig(null);
@@ -61,9 +74,10 @@ describe("parseRolesConfig", () => {
       }),
     );
     expect(cfg.roles).toEqual([
-      { role: "lead", profile: "work", sessions: ["lead", "boss-*"] },
-      { role: "web", profile: null, sessions: ["web"] },
+      { ...NO_CATALOGUE, role: "lead", profile: "work", sessions: ["lead", "boss-*"] },
+      { ...NO_CATALOGUE, role: "web", profile: null, sessions: ["web"] },
     ]);
+    expect(cfg.reservedPrefixes).toEqual([]);
     expect(cfg.expiryMs).toBe(2 * 3_600_000);
     expect(cfg.ackTimeoutMs).toBe(5 * 60_000);
   });
@@ -89,6 +103,91 @@ describe("parseRolesConfig", () => {
       JSON.stringify({ mail: { expiryHours: 10_000 } }),
     ];
     for (const text of bad) expect(() => parseRolesConfig(text)).toThrow(RolesConfigError);
+  });
+});
+
+describe("parseRolesConfig: the role catalogue", () => {
+  const full = {
+    role: "web",
+    profile: "work",
+    folder: "C:\\work\\web",
+    brief: "C:\\work\\briefs\\web.md",
+    model: "opus[1m]",
+    effort: "xhigh",
+    gateway: true,
+    mcpServers: ["chat", "docs"],
+    plugins: ["kit@team"],
+    telegramChats: ["desk"],
+    questionPrefix: "WEB",
+  };
+
+  test("reads every catalogue field and the reserved prefixes", () => {
+    const cfg = parseRolesConfig(
+      JSON.stringify({ roles: [full], reservedPrefixes: ["OLD", "X1"] }),
+    );
+    expect(cfg.roles).toEqual([{ ...full, sessions: ["web"] }]);
+    expect(cfg.reservedPrefixes).toEqual(["OLD", "X1"]);
+  });
+
+  test("accepts model aliases and full model ids, with or without [1m]", () => {
+    for (const model of ["opus", "sonnet", "haiku", "fable", "sonnet[1m]", "claude-opus-5-5"]) {
+      expect(
+        parseRolesConfig(JSON.stringify({ roles: [{ role: "web", model }] })).roles[0]?.model,
+      ).toBe(model);
+    }
+  });
+
+  test("refuses bad catalogue values", () => {
+    const bad: Record<string, unknown>[] = [
+      { folder: "relative\\path" },
+      { folder: "C:\\a;b" },
+      { folder: 'C:\\a"b' },
+      { folder: "C:\\a\nb" },
+      { brief: "brief.md" },
+      { model: "gpt-9" },
+      { model: "opus; rm" },
+      { effort: "extreme" },
+      { gateway: "yes" },
+      { mcpServers: "chat" },
+      { mcpServers: ["bad name"] },
+      { plugins: [""] },
+      { telegramChats: [3] },
+      { questionPrefix: "sh" },
+      { questionPrefix: "TOOLONGPREFIX1" },
+      { questionPrefix: "S-H" },
+    ];
+    for (const extra of bad) {
+      expect(() =>
+        parseRolesConfig(JSON.stringify({ roles: [{ role: "web", ...extra }] })),
+      ).toThrow(RolesConfigError);
+    }
+  });
+
+  test("a question prefix is unique across roles and the reserved prefixes", () => {
+    expect(() =>
+      parseRolesConfig(
+        JSON.stringify({
+          roles: [
+            { role: "web", questionPrefix: "WEB" },
+            { role: "api", questionPrefix: "WEB" },
+          ],
+        }),
+      ),
+    ).toThrow(RolesConfigError);
+    expect(() =>
+      parseRolesConfig(
+        JSON.stringify({
+          roles: [{ role: "web", questionPrefix: "OLD" }],
+          reservedPrefixes: ["OLD"],
+        }),
+      ),
+    ).toThrow(RolesConfigError);
+    expect(() => parseRolesConfig(JSON.stringify({ reservedPrefixes: ["OLD", "OLD"] }))).toThrow(
+      RolesConfigError,
+    );
+    expect(() => parseRolesConfig(JSON.stringify({ reservedPrefixes: ["old"] }))).toThrow(
+      RolesConfigError,
+    );
   });
 });
 

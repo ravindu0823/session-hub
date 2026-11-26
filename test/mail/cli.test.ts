@@ -38,6 +38,20 @@ function open(): Store {
   return s;
 }
 
+/** `hub roles --json` fields of a role with no catalogue entry. */
+const NO_CATALOGUE = {
+  folder: null,
+  brief: null,
+  model: null,
+  effort: null,
+  gateway: false,
+  mcpServers: [],
+  plugins: [],
+  telegramChats: [],
+  questionPrefix: null,
+  problems: [],
+};
+
 interface Run {
   code: number;
   out: string[];
@@ -68,6 +82,7 @@ function deps(
       clock += ms;
     },
     callerWaitMs: 0,
+    exists: () => true,
     ...over,
   };
 }
@@ -373,6 +388,7 @@ describe("hub roles", () => {
     const r = await run("roles", ["--json"], {});
     const rows = r.out.map((l) => json(l));
     expect(rows).toContainEqual({
+      ...NO_CATALOGUE,
       role: "beta",
       profile: "home",
       sessions: ["beta"],
@@ -380,6 +396,7 @@ describe("hub roles", () => {
       queued: 1,
     });
     expect(rows).toContainEqual({
+      ...NO_CATALOGUE,
       role: "alpha",
       profile: "work",
       sessions: ["alpha"],
@@ -388,6 +405,45 @@ describe("hub roles", () => {
     });
     const human = (await run("roles", [], {})).out.join("\n");
     expect(human).toContain("beta: 1 queued, no live session (start one named beta)");
+  });
+
+  test("returns the catalogue fields and flags missing paths and shared chats as problems", async () => {
+    roles = JSON.stringify({
+      roles: [
+        {
+          role: "alpha",
+          profile: "work",
+          folder: "C:\\w\\alpha",
+          brief: "C:\\w\\alpha.md",
+          model: "sonnet",
+          effort: "high",
+          gateway: true,
+          telegramChats: ["desk", "ops"],
+          questionPrefix: "AL",
+        },
+        { role: "beta", profile: "home", folder: "C:\\w\\gone", telegramChats: ["ops"] },
+      ],
+    });
+    const present = new Set(["C:\\w\\alpha", "C:\\w\\alpha.md"]);
+    const r = await run("roles", ["--json"], {}, { exists: (p) => present.has(p) });
+    const rows = r.out.map((l) => json(l));
+    const alpha = rows.find((x) => x.role === "alpha");
+    const beta = rows.find((x) => x.role === "beta");
+    expect(alpha).toMatchObject({
+      folder: "C:\\w\\alpha",
+      brief: "C:\\w\\alpha.md",
+      model: "sonnet",
+      effort: "high",
+      gateway: true,
+      questionPrefix: "AL",
+      problems: ['telegram chat "ops" is also listed by role beta'],
+    });
+    expect(beta?.problems).toEqual([
+      "folder not found: C:\\w\\gone",
+      'telegram chat "ops" is also listed by role alpha',
+    ]);
+    const human = (await run("roles", [], {}, { exists: (p) => present.has(p) })).out.join("\n");
+    expect(human).toContain("beta: 0 queued, live: beta [profile home] (2 problems)");
   });
 });
 

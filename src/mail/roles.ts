@@ -18,16 +18,46 @@ const MAX_EXPIRY_HOURS = 7 * 24;
 const MAX_ACK_TIMEOUT_MINUTES = 24 * 60;
 const MAX_PATTERN_CHARS = 64;
 
+/** Effort levels a role may name (Claude Code's `--effort`). */
+export const EFFORTS: readonly string[] = ["low", "medium", "high", "xhigh", "max"];
+
+/** Model aliases or full `claude-*` ids, each optionally with `[1m]`; nothing a shell could read. */
+const MODEL_RE = /^(?:opus|sonnet|haiku|fable|claude-[a-z0-9-]{1,60})(?:\[1m\])?$/;
+/** Question-ID family prefix, e.g. `WEB` for `WEB-Q12`: upper case and digits, 1 to 12 characters. */
+const PREFIX_RE = /^[A-Z][A-Z0-9]{0,11}$/;
+/** Names of MCP servers, plugins and chats: shown, never run. */
+const NAME_RE = /^[A-Za-z0-9@._:-]{1,64}$/;
+const MAX_NAMES = 50;
+const MAX_PATH_CHARS = 260;
+
 export interface RoleEntry {
   role: string;
   /** Profile id the role's sessions run in; null matches any profile. */
   profile: string | null;
   /** Session-name patterns, `*` matches any run of characters; compared without case. */
   sessions: string[];
+  // The role catalogue: how a session of this role is started. Read by launchers through
+  // `hub roles --json`; the hub itself only checks and shows it.
+  /** Absolute folder the session starts in. */
+  folder: string | null;
+  /** Absolute path of the start prompt or handover file. */
+  brief: string | null;
+  model: string | null;
+  effort: string | null;
+  /** Started through the team gateway. */
+  gateway: boolean;
+  mcpServers: string[];
+  plugins: string[];
+  /** Chat nicknames this role watches; one role per chat. */
+  telegramChats: string[];
+  /** Family prefix of this role's owner-question IDs; unique. */
+  questionPrefix: string | null;
 }
 
 export interface RolesConfig {
   roles: RoleEntry[];
+  /** Question prefixes in use by families with no catalogue entry; no role may take them. */
+  reservedPrefixes: string[];
   /** How long queued mail waits for its role before it expires. */
   expiryMs: number;
   /** How long delivered mail may stay unacknowledged before its sender is told. */
@@ -68,6 +98,45 @@ function positiveNumber(v: unknown, max: number, what: string): number {
   return v;
 }
 
+/** An absolute Windows path with no character a launcher's command line could misread. */
+function optionalPath(v: unknown, role: string, what: string): string | null {
+  if (v === undefined) return null;
+  if (
+    typeof v !== "string" ||
+    v.length > MAX_PATH_CHARS ||
+    !/^[A-Za-z]:[\\/]/.test(v) ||
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses
+    /[;"\u0000-\u001f\u007f]/.test(v)
+  ) {
+    throw new RolesConfigError(
+      `"${role}": ${what} must be an absolute path (C:\\...) without ';', '"' or control characters`,
+    );
+  }
+  return v;
+}
+
+function optionalMatch(v: unknown, re: RegExp, role: string, what: string): string | null {
+  if (v === undefined) return null;
+  if (typeof v !== "string" || !re.test(v)) {
+    throw new RolesConfigError(`"${role}": ${what} is not valid`);
+  }
+  return v;
+}
+
+function nameList(v: unknown, role: string, what: string): string[] {
+  if (v === undefined) return [];
+  if (
+    !Array.isArray(v) ||
+    v.length > MAX_NAMES ||
+    !v.every((n) => typeof n === "string" && NAME_RE.test(n))
+  ) {
+    throw new RolesConfigError(
+      `"${role}": ${what} must be a list of names (letters, digits, @ . _ : -)`,
+    );
+  }
+  return v as string[];
+}
+
 function parseEntry(v: unknown, seen: Set<string>): RoleEntry {
   if (!isRecord(v)) throw new RolesConfigError("each entry in roles must be an object");
   const role = v.role;
@@ -98,13 +167,53 @@ function parseEntry(v: unknown, seen: Set<string>): RoleEntry {
     }
     sessions = list as string[];
   }
-  return { role, profile, sessions };
+  const effort = optionalMatch(v.effort, /^[a-z]+$/, role, "effort");
+  if (effort !== null && !EFFORTS.includes(effort)) {
+    throw new RolesConfigError(`"${role}": effort must be one of ${EFFORTS.join(", ")}`);
+  }
+  if (v.gateway !== undefined && typeof v.gateway !== "boolean") {
+    throw new RolesConfigError(`"${role}": gateway must be true or false`);
+  }
+  return {
+    role,
+    profile,
+    sessions,
+    folder: optionalPath(v.folder, role, "folder"),
+    brief: optionalPath(v.brief, role, "brief"),
+    model: optionalMatch(v.model, MODEL_RE, role, "model"),
+    effort,
+    gateway: v.gateway === true,
+    mcpServers: nameList(v.mcpServers, role, "mcpServers"),
+    plugins: nameList(v.plugins, role, "plugins"),
+    telegramChats: nameList(v.telegramChats, role, "telegramChats"),
+    questionPrefix: optionalMatch(v.questionPrefix, PREFIX_RE, role, "questionPrefix"),
+  };
+}
+
+/** Every question prefix names one family: the reserved ones and each role's own. */
+function checkPrefixes(cfg: RolesConfig): void {
+  const owner = new Map<string, string>();
+  for (const p of cfg.reservedPrefixes) {
+    if (owner.has(p)) throw new RolesConfigError(`reserved prefix ${p} is listed twice`);
+    owner.set(p, "reservedPrefixes");
+  }
+  for (const e of cfg.roles) {
+    if (e.questionPrefix === null) continue;
+    const other = owner.get(e.questionPrefix);
+    if (other !== undefined) {
+      throw new RolesConfigError(
+        `"${e.role}": question prefix ${e.questionPrefix} is already used by ${other}`,
+      );
+    }
+    owner.set(e.questionPrefix, `role "${e.role}"`);
+  }
 }
 
 /** Parses the roles file; null (no file) gives no roles. Throws RolesConfigError when invalid. */
 export function parseRolesConfig(text: string | null): RolesConfig {
   const cfg: RolesConfig = {
     roles: [],
+    reservedPrefixes: [],
     expiryMs: DEFAULT_EXPIRY_MS,
     ackTimeoutMs: DEFAULT_ACK_TIMEOUT_MS,
   };
@@ -121,6 +230,14 @@ export function parseRolesConfig(text: string | null): RolesConfig {
     const seen = new Set<string>();
     cfg.roles = json.roles.map((e) => parseEntry(e, seen));
   }
+  if (json.reservedPrefixes !== undefined) {
+    const list = json.reservedPrefixes;
+    if (!Array.isArray(list) || !list.every((p) => typeof p === "string" && PREFIX_RE.test(p))) {
+      throw new RolesConfigError("reservedPrefixes must be a list of prefixes (A-Z, 0-9)");
+    }
+    cfg.reservedPrefixes = list as string[];
+  }
+  checkPrefixes(cfg);
   if (json.mail !== undefined) {
     if (!isRecord(json.mail)) throw new RolesConfigError("mail must be an object");
     if (json.mail.expiryHours !== undefined) {

@@ -326,6 +326,7 @@ export function realCliDeps(opts: {
         err: (line) => process.stderr.write(`${line}\n`),
         readInput: async (p) => (p === "-" ? await Bun.stdin.text() : readFileSync(p, "utf8")),
         sleep: (ms) => Bun.sleep(ms),
+        exists: (p) => existsSync(p),
       }),
     sleep: (ms) => Bun.sleep(ms),
   };

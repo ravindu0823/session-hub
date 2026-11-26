@@ -4,6 +4,7 @@ import {
   HUB_ROLE,
   OWNER_ROLE,
   parseRolesConfig,
+  type RoleEntry,
   type RolesConfig,
   RolesConfigError,
 } from "./roles.ts";
@@ -44,6 +45,8 @@ export interface MailCliDeps {
   callerWaitMs?: number;
   /** How often `follow` looks for new mail (default 500 ms). */
   pollMs?: number;
+  /** Whether a catalogue path exists (`hub roles` reports missing ones); never reads the file. */
+  exists(path: string): boolean;
 }
 
 export const MAIL_USAGE = [
@@ -527,32 +530,70 @@ async function cmdDecisions(c: Ctx, args: readonly string[]): Promise<number> {
   return 0;
 }
 
-interface RoleLine {
+type RoleLine = Omit<RoleEntry, "role" | "profile" | "sessions"> & {
   role: string;
   profile: string | null;
   sessions: string[];
   live: string[];
   queued: number;
+  /** Warnings about the catalogue entry: missing paths, a chat two roles list. */
+  problems: string[];
+};
+
+/** A role with no catalogue entry. */
+function bareLine(role: string): RoleLine {
+  return {
+    role,
+    profile: null,
+    sessions: [role],
+    live: [],
+    queued: 0,
+    folder: null,
+    brief: null,
+    model: null,
+    effort: null,
+    gateway: false,
+    mcpServers: [],
+    plugins: [],
+    telegramChats: [],
+    questionPrefix: null,
+    problems: [],
+  };
+}
+
+/** Missing folders and briefs, and chats more than one role lists. */
+function catalogueProblems(roles: readonly RoleEntry[], exists: (p: string) => boolean) {
+  const byChat = new Map<string, string[]>();
+  for (const e of roles) {
+    for (const c of new Set(e.telegramChats)) byChat.set(c, [...(byChat.get(c) ?? []), e.role]);
+  }
+  const out = new Map<string, string[]>();
+  for (const e of roles) {
+    const list: string[] = [];
+    if (e.folder !== null && !exists(e.folder)) list.push(`folder not found: ${e.folder}`);
+    if (e.brief !== null && !exists(e.brief)) list.push(`brief not found: ${e.brief}`);
+    for (const c of new Set(e.telegramChats)) {
+      const others = (byChat.get(c) ?? []).filter((r) => r !== e.role);
+      if (others.length > 0) {
+        list.push(`telegram chat "${c}" is also listed by role ${others.join(", ")}`);
+      }
+    }
+    out.set(e.role, list);
+  }
+  return out;
 }
 
 async function cmdRoles(c: Ctx, args: readonly string[]): Promise<number> {
   const p = parseArgs(args, { flags: ["json"] });
   const live = liveSessionsByRole(c.store, c.cfg);
   const queued = c.store.mail().queuedByRole();
+  const problems = catalogueProblems(c.cfg.roles, c.d.exists);
   const lines = new Map<string, RoleLine>();
   for (const e of c.cfg.roles) {
-    lines.set(e.role, {
-      role: e.role,
-      profile: e.profile,
-      sessions: e.sessions,
-      live: [],
-      queued: 0,
-    });
+    lines.set(e.role, { ...e, live: [], queued: 0, problems: problems.get(e.role) ?? [] });
   }
   for (const role of [...live.keys(), ...queued.keys()]) {
-    if (!lines.has(role)) {
-      lines.set(role, { role, profile: null, sessions: [role], live: [], queued: 0 });
-    }
+    if (!lines.has(role)) lines.set(role, bareLine(role));
   }
   const out = [...lines.values()]
     .map((l) => ({ ...l, live: live.get(l.role) ?? [], queued: queued.get(l.role) ?? 0 }))
@@ -562,7 +603,10 @@ async function cmdRoles(c: Ctx, args: readonly string[]): Promise<number> {
       c.d.out(jsonLine(l));
       continue;
     }
-    const where = l.profile === null ? "" : ` [profile ${l.profile}]`;
+    const n = l.problems.length;
+    const where =
+      (l.profile === null ? "" : ` [profile ${l.profile}]`) +
+      (n === 0 ? "" : ` (${n} problem${n === 1 ? "" : "s"})`);
     if (l.live.length > 0) {
       c.d.out(`${l.role}: ${l.queued} queued, live: ${l.live.map(cleanText).join(", ")}${where}`);
     } else {

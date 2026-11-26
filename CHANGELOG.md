@@ -11,6 +11,9 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
 
 ### Added
 
+- Role catalogue in `roles.json`: optional `folder`, `brief`, `model`, `effort`, `gateway`, `mcpServers`, `plugins`,
+  `telegramChats` and a unique `questionPrefix` per role, plus `reservedPrefixes`, checked by the parser and returned
+  by `hub roles --json` with per-role problems (missing paths, a chat two roles list). (#34)
 - Mail between sessions, addressed by role and stored in `hub.db` with no model in between: `hub mail send`,
   `inbox`, `follow` (one JSON line per message, for a monitor), `ack`, `done`, `sent` and `show`; roles from an
   optional local `roles.json` or the session's name, and `hub roles`. Mail for a role with no live session waits

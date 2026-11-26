@@ -11,6 +11,7 @@ import {
   SEND_TRACK_MS,
 } from "../../src/bridge/server";
 import { DELIVERY_WINDOW_MS, EXPIRE_EVERY_MS } from "../../src/config";
+import { parseRolesConfig } from "../../src/mail/roles";
 import { SendRefused, type SendRequest } from "../../src/send/relay";
 import { type SendRow, type SessionRow, Store } from "../../src/store/db";
 import { FakeClock, FakeIo, flush, type Out } from "./harness";
@@ -1040,7 +1041,7 @@ describe("answer", () => {
     });
     start({
       roles: () => ({
-        roles: [{ role: "web", profile: null, sessions: ["web-*"] }],
+        ...parseRolesConfig(JSON.stringify({ roles: [{ role: "web", sessions: ["web-*"] }] })),
         expiryMs: 1,
         ackTimeoutMs: 1,
       }),
