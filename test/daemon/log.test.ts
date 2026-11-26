@@ -88,10 +88,9 @@ describe("errFields", () => {
       caught = e;
     }
     const f = errFields(caught);
-    expect(f.code).toBe("ENOENT");
-    expect(String(f.msg)).toContain("<path>");
-    for (const leak of ["Jane", "Doe", "secret-project", "a b.jsonl", dir]) {
-      expect(String(f.msg)).not.toContain(leak);
+    expect(f).toEqual({ err: "Error", code: "ENOENT" });
+    for (const leak of ["Jane", "Doe", "secret-project", "a b.jsonl"]) {
+      expect(JSON.stringify(f)).not.toContain(leak);
     }
   });
 

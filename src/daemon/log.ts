@@ -34,13 +34,18 @@ export function redactPaths(text: string): string {
   return text.replace(QUOTED_PATH_RE, "<path>").replace(BARE_PATH_RE, "<path>");
 }
 
-/** Fields for a caught error: its name, its system code (ENOENT ...) and its message without paths. */
+/**
+ * Fields for a caught error. A system error (one with a code such as ENOENT or EBUSY) gives only its
+ * name and code: its message quotes the path it failed on. Any other error is our own fixed text and
+ * keeps its message, with paths removed all the same.
+ */
 export function errFields(e: unknown): LogFields {
   if (e instanceof Error) {
-    const f: LogFields = { err: clip(e.name), msg: clip(redactPaths(e.message)) };
     const code = (e as { code?: unknown }).code;
-    if (typeof code === "string" && /^[A-Z0-9_]{1,40}$/.test(code)) f.code = code;
-    return f;
+    if (typeof code === "string" && /^[A-Z0-9_]{1,40}$/.test(code)) {
+      return { err: clip(e.name), code };
+    }
+    return { err: clip(e.name), msg: clip(redactPaths(e.message)) };
   }
   return { err: "Error", msg: clip(redactPaths(String(e))) };
 }
