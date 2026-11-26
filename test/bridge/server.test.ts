@@ -941,7 +941,9 @@ describe("answer", () => {
     const d = other.mail().getDecision("D-0001");
     expect(d?.answer).toBe("yes");
     expect(d?.answeredVia).toBe("tray");
-    expect(other.mail().inbox("web")[0]?.body).toBe("D-0001 answered by the owner: yes");
+    expect(other.mail().inbox("web")[0]?.body).toBe(
+      "D-0001 answered: yes (recorded via tray, outside Claude Code; not proof of who sent it)",
+    );
     await clock.advance(POLL_MS);
     expect(snaps().length).toBeGreaterThan(before);
     const last = snaps().at(-1) as unknown as {

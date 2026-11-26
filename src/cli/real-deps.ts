@@ -10,7 +10,7 @@ import { identifyDaemon, type LockInfo } from "../daemon/lock.ts";
 import { createLogger } from "../daemon/log.ts";
 import { realClaudeCli } from "../discovery/agents.ts";
 import { runMailCli } from "../mail/cli.ts";
-import { type RolesConfig, rolesLoader } from "../mail/roles.ts";
+import { parseRolesConfig, type RolesConfig, rolesLoader } from "../mail/roles.ts";
 import { mailUpkeep } from "../mail/service.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
@@ -111,6 +111,15 @@ function readRolesFile(dataDir: string): string | null {
   }
 }
 
+/** For the TUI: the roles file, or no roles when it is missing, unreadable or invalid. */
+export function rolesForView(dataDir: string): RolesConfig {
+  try {
+    return parseRolesConfig(readRolesFile(dataDir));
+  } catch {
+    return parseRolesConfig(null);
+  }
+}
+
 /** Pure: how the relay's hook runs `hub relay-guard` from this executable. */
 export function relayGuardArgvFor(opts: {
   execPath: string;
@@ -172,6 +181,7 @@ export async function runRealBridge(
     now: () => Date.now(),
     sleep: (ms) => Bun.sleep(ms),
     version: opts.version,
+    roles: () => parseRolesConfig(readRolesFile(paths.dataDir)),
   };
   // A broken stdout means the tray cannot hear us: say so once on stderr and stop with exit 1.
   let broken = false;
