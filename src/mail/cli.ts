@@ -579,6 +579,10 @@ export async function runMailCli(
     d.err(MAIL_USAGE);
     return 2;
   }
+  if (args[0] === "--help" || args[0] === "-h") {
+    d.out(MAIL_USAGE);
+    return 0;
+  }
   let store: Store | null = null;
   try {
     const cfg = parseRolesConfig(d.readRoles());

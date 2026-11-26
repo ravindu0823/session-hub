@@ -18,6 +18,7 @@ import {
   type LockInfo,
   parseLock,
 } from "../daemon/lock.ts";
+import { MAIL_COMMANDS } from "../mail/cli.ts";
 import type { Platform } from "../platform/types.ts";
 import {
   describeBuild,
@@ -88,6 +89,12 @@ export const USAGE = [
   "                          remove the install and the data; --keep-data keeps the data",
   "  hub bridge              (internal) data link for the tray app over stdin/stdout",
   "  hub relay-guard         (internal) the relay's tool-call guard (one message, one recipient)",
+  "  hub mail send ...       mail to another session, addressed by role",
+  "  hub mail follow         one JSON line per new mail, for a monitor",
+  "  hub mail --help         every mail command (inbox, ack, done, sent, show)",
+  "  hub ask | answer | decisions",
+  "                          the owner's decision list (see hub mail --help)",
+  "  hub roles               roles, their live sessions and queued mail",
   "  hub --version           print the version",
   "  hub --help              print this help",
 ].join("\n");
@@ -180,6 +187,8 @@ export interface CliDeps {
   guardArgv: string[];
   /** `hub relay-guard`: reads one hook input from stdin; exit 0 allows the tool call, 2 blocks it. */
   runRelayGuard(): Promise<number>;
+  /** `hub mail|ask|answer|decisions|roles` (src/mail/cli.ts); returns the exit code. */
+  runMail(cmd: string, args: string[]): Promise<number>;
   sleep(ms: number): Promise<void>;
 }
 
@@ -792,6 +801,7 @@ async function cmdUninstall(purge: boolean, d: CliDeps): Promise<number> {
 async function dispatch(argv: string[], d: CliDeps): Promise<number> {
   const [cmd, ...rest] = argv;
   if (cmd === undefined) return cmdTui(d);
+  if (MAIL_COMMANDS.includes(cmd)) return d.runMail(cmd, rest);
   const noArgs = () => {
     if (rest.length > 0) throw new UsageError();
   };

@@ -375,6 +375,20 @@ describe("hub roles", () => {
   });
 });
 
+describe("help", () => {
+  test("--help prints the mail usage and exits 0, without opening the index", async () => {
+    for (const [cmd, args] of [
+      ["mail", ["--help"]],
+      ["ask", ["-h"]],
+      ["roles", ["--help"]],
+    ] as const) {
+      const r = await run(cmd, [...args], {}, { openStore: () => null });
+      expect(r.code).toBe(0);
+      expect(r.out.join(" ")).toContain("hub mail send --to <role>");
+    }
+  });
+});
+
 describe("setup errors", () => {
   test("a missing hub.db or a bad roles.json exits 1", async () => {
     roles = "{";

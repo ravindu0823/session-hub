@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import pkg from "../../package.json" with { type: "json" };
@@ -9,6 +9,9 @@ import { DATA_DIR, PROFILES, RELAY_LOG } from "../config.ts";
 import { identifyDaemon, type LockInfo } from "../daemon/lock.ts";
 import { createLogger } from "../daemon/log.ts";
 import { realClaudeCli } from "../discovery/agents.ts";
+import { runMailCli } from "../mail/cli.ts";
+import { parseRolesConfig, type RolesConfig } from "../mail/roles.ts";
+import { mailUpkeep } from "../mail/service.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
 import { claimMarkerFile, runGuard } from "../send/guard.ts";
@@ -95,6 +98,25 @@ const RM_LOOP =
 function removeAfterExit(paths: string[]): void {
   for (const p of paths) {
     spawnDetached([sysbin.cmd(), "/d", "/c", RM_LOOP], { env: { HUB_RM: p }, verbatim: true });
+  }
+}
+
+/** The local roles file (never in the repository): null when there is none. */
+function readRolesFile(dataDir: string): string | null {
+  try {
+    return readFileSync(join(dataDir, "roles.json"), "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
+  }
+}
+
+/** The daemon keeps its upkeep going on the default timings while roles.json is unreadable or invalid. */
+function rolesOrDefaults(dataDir: string): RolesConfig {
+  try {
+    return parseRolesConfig(readRolesFile(dataDir));
+  } catch {
+    return parseRolesConfig(null);
   }
 }
 
@@ -253,6 +275,7 @@ export function realCliDeps(opts: {
             log.warn("relay_stray", { sessionId: s.sessionId, ts: s.ts }),
           ),
         expireSends,
+        mailUpkeep: (store, now) => mailUpkeep(store, rolesOrDefaults(paths.dataDir), now()),
       }),
     runTui: opts.runTui,
     runBridge: opts.runBridge,
@@ -268,6 +291,23 @@ export function realCliDeps(opts: {
         err: (line) =>
           process.stderr.write(`${line}
 `),
+      }),
+    runMail: (cmd, args) =>
+      runMailCli(cmd, args, {
+        // create:false and the existence check: the CLI never creates hub.db (the daemon does).
+        openStore: () =>
+          existsSync(paths.dbPath) ? Store.open(paths.dbPath, { create: false }) : null,
+        readRoles: () => readRolesFile(paths.dataDir),
+        env: process.env,
+        now,
+        out: (line) =>
+          process.stdout.write(`${line}
+`),
+        err: (line) =>
+          process.stderr.write(`${line}
+`),
+        readInput: async (p) => (p === "-" ? await Bun.stdin.text() : readFileSync(p, "utf8")),
+        sleep: (ms) => Bun.sleep(ms),
       }),
     sleep: (ms) => Bun.sleep(ms),
   };
