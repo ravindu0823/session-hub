@@ -565,7 +565,20 @@ describe("migrations", () => {
     const row = raw.query("SELECT MAX(version) AS v FROM schema_version").get() as { v: number };
     raw.close();
     expect(row.v).toBe(MIGRATIONS.length);
-    expect(MIGRATIONS.length).toBe(5);
+    expect(MIGRATIONS.length).toBe(6);
+  });
+
+  test("v6 adds empty mail and decision tables to a v5 index and keeps its data", () => {
+    const raw = new Database(dbPath, { create: true, strict: true });
+    raw.run("CREATE TABLE schema_version (version INTEGER NOT NULL)");
+    for (const m of MIGRATIONS.slice(0, 5)) raw.run(m);
+    raw.run("INSERT INTO schema_version (version) VALUES (1), (2), (3), (4), (5)");
+    raw.run("INSERT INTO meta (key, value) VALUES ('kept', 'yes')");
+    raw.close();
+    const s = open();
+    expect(s.getMeta("kept")).toBe("yes");
+    expect(s.mail().inbox("anyone", { all: true })).toEqual([]);
+    expect(s.mail().listDecisions({})).toEqual([]);
   });
 
   test("v5 drops indexed compaction summaries and local command output, keeping the owner's own text", () => {

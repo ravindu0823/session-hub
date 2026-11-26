@@ -147,4 +147,49 @@ DELETE FROM messages
      OR text LIKE '<local-command-stderr>%'
      OR text LIKE 'This session is being continued from a previous conversation%');
 `,
+  // v6: mail between sessions, addressed by role (src/mail), and the owner's decision list. The ids
+  // never repeat (AUTOINCREMENT), so "M-000417" names one message for good, purged or not.
+  `
+CREATE TABLE mail (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  thread TEXT NOT NULL,
+  from_role TEXT NOT NULL,
+  from_session TEXT,
+  to_role TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('task', 'answer', 'fyi', 'decision', 'chat-in', 'chat-out')),
+  body TEXT NOT NULL,
+  body_sha TEXT NOT NULL,
+  evidence TEXT,
+  state TEXT NOT NULL CHECK (state IN ('queued', 'delivered', 'acked', 'done', 'expired')),
+  created_at INTEGER NOT NULL,
+  delivered_at INTEGER,
+  delivered_session TEXT,
+  deliveries INTEGER NOT NULL DEFAULT 0,
+  acked_at INTEGER,
+  done_at INTEGER,
+  expires_at INTEGER NOT NULL,
+  flagged_at INTEGER
+);
+CREATE INDEX mail_to_state ON mail(to_role, state, id);
+CREATE INDEX mail_from ON mail(from_role, id);
+CREATE INDEX mail_state ON mail(state, id);
+CREATE INDEX mail_created ON mail(created_at);
+
+CREATE TABLE decisions (
+  id TEXT PRIMARY KEY,
+  seq INTEGER NOT NULL UNIQUE,
+  role TEXT NOT NULL,
+  question TEXT NOT NULL,
+  options_json TEXT NOT NULL,
+  recommendation TEXT,
+  state TEXT NOT NULL CHECK (state IN ('open', 'answered', 'closed')),
+  answer TEXT,
+  answered_at INTEGER,
+  answered_via TEXT,
+  conflicts_json TEXT NOT NULL DEFAULT '[]',
+  created_at INTEGER NOT NULL,
+  from_session TEXT
+);
+CREATE INDEX decisions_state ON decisions(state, seq);
+`,
 ];

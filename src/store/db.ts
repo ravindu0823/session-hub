@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { RELAY_NAME, RETENTION_MS } from "../config";
 import type { TailState } from "../ingest/tail";
+import { MailStore } from "../mail/store";
 import { answeredIds } from "../status/answered";
 import type { Status, WaitingItem } from "../status/extract";
 import { MIGRATIONS } from "./schema";
@@ -200,6 +201,14 @@ export class Store {
 
   close(): void {
     this.db.close();
+  }
+
+  private mailStore: MailStore | null = null;
+
+  /** Mail between sessions and the owner's decision list (src/mail). */
+  mail(): MailStore {
+    this.mailStore ??= new MailStore(this.db);
+    return this.mailStore;
   }
 
   /** Runs fn in one write transaction; rolls back if it throws. */
@@ -488,6 +497,7 @@ export class Store {
           .query("DELETE FROM sessions WHERE ended_at IS NOT NULL AND ended_at < ?")
           .run(cutoff);
         this.db.query("DELETE FROM sends WHERE created_at < ?").run(cutoff);
+        this.mail().purge(cutoff);
       })
       .immediate();
     // The deletes zero the freed pages (secure_delete), but older WAL frames still hold the text
