@@ -155,8 +155,11 @@ export class MailStore {
     return r ? toMail(r) : null;
   }
 
-  /** Hands queued mail for a role to one session, oldest first; nobody else gets those rows. */
-  claim(toRole: string, sessionId: string, now: number): MailRow[] {
+  /**
+   * Hands queued mail for a role to one session (null: the owner, outside Claude Code), oldest
+   * first; nobody else gets those rows.
+   */
+  claim(toRole: string, sessionId: string | null, now: number): MailRow[] {
     const rows = this.db
       .query(
         `UPDATE mail SET state = 'delivered', delivered_at = $now, delivered_session = $sid,
@@ -167,6 +170,15 @@ export class MailStore {
       )
       .all({ now, sid: sessionId, role: toRole }) as Row[];
     return rows.map(toMail).sort((a, b) => a.id - b.id);
+  }
+
+  /** A cheap read: does this role have queued mail? (followers poll it before they claim). */
+  hasQueued(toRole: string): boolean {
+    return (
+      this.db
+        .query("SELECT 1 FROM mail WHERE to_role = ? AND state = 'queued' LIMIT 1")
+        .get(toRole) !== null
+    );
   }
 
   /** Mail delivered to this session and not acknowledged yet, oldest first. */
@@ -250,13 +262,13 @@ export class MailStore {
 
   /**
    * Delivered, unacknowledged mail whose session has ended, or is unknown to the index, goes back to
-   * the queue: the next session of that role gets it.
+   * the queue: the next session of that role gets it. Mail the owner read (no session) stays.
    */
   requeueEnded(): MailRow[] {
     const rows = this.db
       .query(
         `UPDATE mail SET state = 'queued', delivered_at = NULL, delivered_session = NULL
-         WHERE state = 'delivered' AND (delivered_session IS NULL OR NOT EXISTS (
+         WHERE state = 'delivered' AND delivered_session IS NOT NULL AND (NOT EXISTS (
            SELECT 1 FROM sessions s WHERE s.session_id = mail.delivered_session AND s.ended_at IS NULL))
          RETURNING *`,
       )

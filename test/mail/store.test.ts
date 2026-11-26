@@ -196,6 +196,23 @@ describe("mail upkeep", () => {
     expect(ms.requeueEnded().map((m) => m.id)).toEqual([1]);
   });
 
+  test("mail the owner read (no session) stays delivered", () => {
+    const ms = store.mail();
+    ms.insert(mail({ toRole: "owner" }));
+    expect(ms.claim("owner", null, 20)[0]?.deliveredSession).toBeNull();
+    expect(ms.requeueEnded()).toEqual([]);
+    expect(ms.get(1)?.state).toBe("delivered");
+  });
+
+  test("hasQueued tells whether a role has queued mail", () => {
+    const ms = store.mail();
+    expect(ms.hasQueued("beta")).toBe(false);
+    ms.insert(mail());
+    expect(ms.hasQueued("beta")).toBe(true);
+    ms.claim("beta", "s-beta", 20);
+    expect(ms.hasQueued("beta")).toBe(false);
+  });
+
   test("unacked mail past the timeout is flagged once; mail from the hub is never flagged", () => {
     store.upsertSession(session("s-beta"));
     const ms = store.mail();

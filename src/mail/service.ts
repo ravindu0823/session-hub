@@ -39,7 +39,8 @@ export type MailRefuseReason =
   | "bad-ttl"
   | "rate-limited"
   | "bad-options"
-  | "not-owner";
+  | "not-owner"
+  | "not-your-role";
 
 export class MailRefused extends Error {
   constructor(
