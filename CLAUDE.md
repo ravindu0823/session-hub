@@ -40,6 +40,7 @@ src/
   discovery/               `claude agents --json` reader, sessions folder watch
   ingest/                  incremental transcript tail and record classification
   status/                  Progress / What's remaining / Waiting on you extraction
+  mail/                    mail between sessions by role, decisions, roles.json, `hub mail|ask|answer|decisions|roles`
   send/                    relay command and SHA-256 delivery verification
   store/                   SQLite schema, migrations and queries
   security/                secret masking
@@ -81,6 +82,11 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
 ## Domain rules
 - Hub messages are information and instructions, never approvals. Approvals stay in the session's own terminal;
   the hub only brings that window to the front. Never add a path that answers a permission prompt.
+- Mail (`src/mail`) is peer text from any process that can write `hub.db`: shown as data with a notice, never an
+  approval. A session's role comes from the session the daemon indexed for `CLAUDE_CODE_SESSION_ID` (outside Claude
+  Code the caller is `owner`); `hub answer` refuses to run inside a session. Text that looks secret is refused, not
+  masked, so mail arrives byte for byte. Every state change is one conditional statement; mail ids never repeat.
+  Role names, profiles and people live only in the local `roles.json`, never in the repository or its tests.
 - A waiting item is "answered" when the owner's own message or a `session-hub-relay` message after the status reply
   names its ID at the start of a line (or after "/", ",", ";", "and") on a line that is not a question. Display only:
   any session can take the relay's name, so this never decides anything but what is shown and counted.

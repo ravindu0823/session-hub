@@ -300,12 +300,8 @@ export function realCliDeps(opts: {
         readRoles: () => readRolesFile(paths.dataDir),
         env: process.env,
         now,
-        out: (line) =>
-          process.stdout.write(`${line}
-`),
-        err: (line) =>
-          process.stderr.write(`${line}
-`),
+        out: (line) => process.stdout.write(`${line}\n`),
+        err: (line) => process.stderr.write(`${line}\n`),
         readInput: async (p) => (p === "-" ? await Bun.stdin.text() : readFileSync(p, "utf8")),
         sleep: (ms) => Bun.sleep(ms),
       }),
