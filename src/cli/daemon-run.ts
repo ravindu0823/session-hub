@@ -6,6 +6,7 @@ import { type DaemonIdentity, LOCK_FILE, type LockInfo, parseLock } from "../dae
 import { createLogger, errFields, type Logger } from "../daemon/log.ts";
 import type { ClaudeCli } from "../discovery/agents.ts";
 import type { Classified } from "../ingest/records.ts";
+import type { UpkeepResult } from "../mail/service.ts";
 import type { Platform } from "../platform/types.ts";
 import { Store } from "../store/db.ts";
 import type { CliPaths, ForegroundResult } from "./commands.ts";
@@ -31,12 +32,45 @@ export interface DaemonRunDeps {
   ): (sessionId: string, records: Classified[]) => void;
   /** Expires overdue sends; returns how many. */
   expireSends(store: Store, now: () => number): number;
+  /** Mail upkeep (requeue, expire, flag); absent in tests that do not need it. */
+  mailUpkeep?(store: Store, now: () => number, log: Logger): UpkeepResult;
   runDaemon?: (deps: DaemonDeps) => Promise<void>;
   /** Signal and process-failure events (default: process). */
   signals?: {
     on(sig: Sig, fn: (e?: unknown) => void): void;
     off(sig: Sig, fn: (e?: unknown) => void): void;
   };
+}
+
+/**
+ * One upkeep pass, every EXPIRE_EVERY_MS: overdue sends expire, then the mail upkeep runs. Each step
+ * is logged when it changed something; a failing step is logged and does not stop the other.
+ */
+export function upkeepTick(
+  store: Store,
+  deps: Pick<DaemonRunDeps, "now" | "expireSends" | "mailUpkeep">,
+  log: Logger,
+): void {
+  try {
+    const n = deps.expireSends(store, deps.now);
+    if (n > 0) log.info("sends_expired", { count: n });
+  } catch (e) {
+    log.warn("expire_failed", errFields(e));
+  }
+  if (deps.mailUpkeep === undefined) return;
+  try {
+    const r = deps.mailUpkeep(store, deps.now, log);
+    if (r.expired + r.requeued + r.flagged + r.closed > 0) {
+      log.info("mail_upkeep", {
+        expired: r.expired,
+        requeued: r.requeued,
+        flagged: r.flagged,
+        closed: r.closed,
+      });
+    }
+  } catch (e) {
+    log.warn("mail_upkeep_failed", errFields(e));
+  }
 }
 
 /** True unless the lock is missing, garbage, or names a "foreign" pid (dead or another program). */
@@ -83,14 +117,7 @@ export async function daemonRun(deps: DaemonRunDeps): Promise<ForegroundResult> 
   const signals = deps.signals ?? (process as unknown as NonNullable<DaemonRunDeps["signals"]>);
   for (const s of SIGNALS) signals.on(s, stop);
   for (const s of FATAL) signals.on(s, fatal);
-  const expiry = setInterval(() => {
-    try {
-      const n = deps.expireSends(store, deps.now);
-      if (n > 0) log.info("sends_expired", { count: n });
-    } catch (e) {
-      log.warn("expire_failed", errFields(e));
-    }
-  }, EXPIRE_EVERY_MS);
+  const expiry = setInterval(() => upkeepTick(store, deps, log), EXPIRE_EVERY_MS);
   try {
     await (deps.runDaemon ?? realRunDaemon)({
       cli: deps.cli,

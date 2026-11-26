@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { RELAY_NAME, RETENTION_MS } from "../config";
 import type { TailState } from "../ingest/tail";
+import { MailStore } from "../mail/store";
 import { answeredIds } from "../status/answered";
 import type { Status, WaitingItem } from "../status/extract";
 import { MIGRATIONS } from "./schema";
@@ -145,6 +146,19 @@ function toSend(r: Row): SendRow {
   };
 }
 
+/** The index is at an older schema and the caller asked not to upgrade it (`migrate: false`). */
+export class IndexOutdated extends Error {
+  constructor(
+    readonly found: number,
+    readonly wanted: number,
+  ) {
+    super(
+      `index schema v${found} is older than this build (v${wanted}); install this build (hub install) so the daemon upgrades it`,
+    );
+    this.name = "IndexOutdated";
+  }
+}
+
 /** Messages deleted per write transaction by purge. */
 const PURGE_BATCH = 500;
 
@@ -155,7 +169,7 @@ export class Store {
    * Opens the index file, creating it when missing unless `create` is false (then a missing file
    * throws). The caller ensures the directory exists.
    */
-  static open(path: string, opts: { create?: boolean } = {}): Store {
+  static open(path: string, opts: { create?: boolean; migrate?: boolean } = {}): Store {
     const create = opts.create ?? true;
     const db = new Database(path, { create, readwrite: true, strict: true });
     db.run("PRAGMA busy_timeout = 5000");
@@ -169,12 +183,31 @@ export class Store {
     // Freed pages are zeroed, so deleted message text cannot be read back from the file (PII-03).
     db.run("PRAGMA secure_delete = ON");
     try {
-      Store.migrate(db);
+      if (opts.migrate === false) Store.requireCurrent(db);
+      else Store.migrate(db);
     } catch (e) {
       db.close();
       throw e;
     }
     return new Store(db);
+  }
+
+  /**
+   * For writers other than the daemon (`hub mail`): an index at an older schema stays as it is, since
+   * an older installed daemon or bridge would refuse to open it once upgraded. Throws IndexOutdated.
+   */
+  private static requireCurrent(db: Database): void {
+    const has = db
+      .query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'")
+      .get();
+    const row = has
+      ? (db.query("SELECT MAX(version) AS v FROM schema_version").get() as { v: number | null })
+      : { v: null };
+    const current = row.v ?? 0;
+    if (current < MIGRATIONS.length) throw new IndexOutdated(current, MIGRATIONS.length);
+    if (current > MIGRATIONS.length) {
+      throw new Error(`index schema v${current} is newer than this build (v${MIGRATIONS.length})`);
+    }
   }
 
   private static migrate(db: Database): void {
@@ -200,6 +233,14 @@ export class Store {
 
   close(): void {
     this.db.close();
+  }
+
+  private mailStore: MailStore | null = null;
+
+  /** Mail between sessions and the owner's decision list (src/mail). */
+  mail(): MailStore {
+    this.mailStore ??= new MailStore(this.db);
+    return this.mailStore;
   }
 
   /** Runs fn in one write transaction; rolls back if it throws. */
@@ -243,6 +284,24 @@ export class Store {
       .query("SELECT * FROM sessions WHERE session_id = ?")
       .get(sessionId) as Row | null;
     return r ? toSession(r) : null;
+  }
+
+  /** Name, profile and end time of every indexed session (for role lookups), without status. */
+  sessionIdentities(): {
+    sessionId: string;
+    name: string;
+    profile: string;
+    endedAt: number | null;
+  }[] {
+    const rows = this.db
+      .query("SELECT session_id, name, profile, ended_at FROM sessions ORDER BY session_id")
+      .all() as Row[];
+    return rows.map((r) => ({
+      sessionId: r.session_id as string,
+      name: r.name as string,
+      profile: r.profile as string,
+      endedAt: (r.ended_at as number | null) ?? null,
+    }));
   }
 
   listSessions(): SessionView[] {
@@ -488,6 +547,7 @@ export class Store {
           .query("DELETE FROM sessions WHERE ended_at IS NOT NULL AND ended_at < ?")
           .run(cutoff);
         this.db.query("DELETE FROM sends WHERE created_at < ?").run(cutoff);
+        this.mail().purge(cutoff);
       })
       .immediate();
     // The deletes zero the freed pages (secure_delete), but older WAL frames still hold the text

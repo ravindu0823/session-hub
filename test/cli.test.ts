@@ -13,11 +13,13 @@ import {
   SHIM_CONTENT,
   USAGE,
 } from "../src/cli/commands.ts";
-import { daemonRun } from "../src/cli/daemon-run.ts";
+import { daemonRun, upkeepTick } from "../src/cli/daemon-run.ts";
 import { daemonArgvFor } from "../src/cli/real-deps.ts";
 import type { DaemonDeps } from "../src/daemon/collector.ts";
 import { identifyDaemon, LOCK_FILE } from "../src/daemon/lock.ts";
+import type { LogFields, Logger } from "../src/daemon/log.ts";
 import { FakePlatform } from "../src/platform/fake.ts";
+import type { Store } from "../src/store/db.ts";
 import { writeBuildManifest } from "./fakes/build-manifest.ts";
 
 const DAEMON_PID = 4242;
@@ -36,6 +38,8 @@ let tuiRuns: { warning?: string }[];
 let bridgeLinks: BridgeLink[];
 let bridgeExit: number;
 let guardRuns: number;
+let mailRuns: [string, string[]][] = [];
+let mailExit = 0;
 let guardExit: number;
 let foregroundRuns: number;
 let spawnStartsDaemon: boolean;
@@ -109,6 +113,10 @@ function makeDeps(over: Partial<CliDeps> = {}): CliDeps {
       guardRuns++;
       return guardExit;
     },
+    runMail: async (cmd, args) => {
+      mailRuns.push([cmd, args]);
+      return mailExit;
+    },
     sleep: async () => {},
     ...over,
   };
@@ -148,6 +156,8 @@ beforeEach(() => {
   bridgeLinks = [];
   bridgeExit = 0;
   guardRuns = 0;
+  mailRuns = [];
+  mailExit = 0;
   guardExit = 0;
   foregroundRuns = 0;
   spawnStartsDaemon = true;
@@ -556,6 +566,34 @@ describe("relay-guard", () => {
   });
 });
 
+describe("mail commands", () => {
+  test("hub mail, ask, answer, decisions and roles go to the mail CLI with their arguments", async () => {
+    mailExit = 1;
+    expect(await runCli(["mail", "inbox", "--json"], makeDeps())).toBe(1);
+    expect(await runCli(["ask", "--question-file", "q.txt"], makeDeps())).toBe(1);
+    expect(await runCli(["answer", "D-0001", "--text", "yes"], makeDeps())).toBe(1);
+    expect(await runCli(["decisions"], makeDeps())).toBe(1);
+    expect(await runCli(["roles"], makeDeps())).toBe(1);
+    expect(mailRuns).toEqual([
+      ["mail", ["inbox", "--json"]],
+      ["ask", ["--question-file", "q.txt"]],
+      ["answer", ["D-0001", "--text", "yes"]],
+      ["decisions", []],
+      ["roles", []],
+    ]);
+  });
+
+  test("usage lists the mail commands", () => {
+    expect(USAGE).toContain("hub mail send");
+    expect(USAGE).toContain("hub mail follow");
+    expect(USAGE).toContain("hub roles");
+  });
+
+  test("hubd.exe does not run mail commands", () => {
+    expect(hubdArgv(["mail", "inbox"])).toBeNull();
+  });
+});
+
 describe("install", () => {
   test("refuses outside the compiled exe", async () => {
     const deps = makeDeps({ compiled: false, daemonArgv: ["bun", "src/cli.ts", "daemon", "run"] });
@@ -892,5 +930,83 @@ describe("daemonRun (foreground)", () => {
     // the store was closed: the db file can be removed on Windows
     rmSync(p.dataDir, { recursive: true, force: true });
     expect(existsSync(p.dataDir)).toBe(false);
+  });
+});
+
+describe("upkeepTick", () => {
+  function memLog(): { log: Logger; lines: [string, string, LogFields | undefined][] } {
+    const lines: [string, string, LogFields | undefined][] = [];
+    return {
+      lines,
+      log: {
+        info: (e, f) => lines.push(["info", e, f]),
+        warn: (e, f) => lines.push(["warn", e, f]),
+        error: (e, f) => lines.push(["error", e, f]),
+      },
+    };
+  }
+  const store = {} as Store;
+
+  test("expires sends and runs the mail upkeep, logging what changed", () => {
+    const { log, lines } = memLog();
+    upkeepTick(
+      store,
+      {
+        now: () => 5,
+        expireSends: () => 2,
+        mailUpkeep: () => ({ expired: 1, requeued: 0, flagged: 3, closed: 4 }),
+      },
+      log,
+    );
+    expect(lines).toEqual([
+      ["info", "sends_expired", { count: 2 }],
+      ["info", "mail_upkeep", { expired: 1, requeued: 0, flagged: 3, closed: 4 }],
+    ]);
+  });
+
+  test("nothing to report logs nothing", () => {
+    const { log, lines } = memLog();
+    upkeepTick(
+      store,
+      {
+        now: () => 5,
+        expireSends: () => 0,
+        mailUpkeep: () => ({ expired: 0, requeued: 0, flagged: 0, closed: 0 }),
+      },
+      log,
+    );
+    expect(lines).toEqual([]);
+  });
+
+  test("a failing step is logged and the other one still runs", () => {
+    const { log, lines } = memLog();
+    upkeepTick(
+      store,
+      {
+        now: () => 5,
+        expireSends: () => {
+          throw new Error("busy");
+        },
+        mailUpkeep: () => ({ expired: 0, requeued: 2, flagged: 0, closed: 0 }),
+      },
+      log,
+    );
+    expect(lines).toEqual([
+      ["warn", "expire_failed", { err: "Error", msg: "busy" }],
+      ["info", "mail_upkeep", { expired: 0, requeued: 2, flagged: 0, closed: 0 }],
+    ]);
+    const second = memLog();
+    upkeepTick(
+      store,
+      {
+        now: () => 5,
+        expireSends: () => 0,
+        mailUpkeep: () => {
+          throw new Error("locked");
+        },
+      },
+      second.log,
+    );
+    expect(second.lines).toEqual([["warn", "mail_upkeep_failed", { err: "Error", msg: "locked" }]]);
   });
 });

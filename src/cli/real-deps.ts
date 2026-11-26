@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import pkg from "../../package.json" with { type: "json" };
@@ -9,6 +9,9 @@ import { DATA_DIR, PROFILES, RELAY_LOG } from "../config.ts";
 import { identifyDaemon, type LockInfo } from "../daemon/lock.ts";
 import { createLogger } from "../daemon/log.ts";
 import { realClaudeCli } from "../discovery/agents.ts";
+import { runMailCli } from "../mail/cli.ts";
+import { type RolesConfig, rolesLoader } from "../mail/roles.ts";
+import { mailUpkeep } from "../mail/service.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
 import { claimMarkerFile, runGuard } from "../send/guard.ts";
@@ -95,6 +98,16 @@ const RM_LOOP =
 function removeAfterExit(paths: string[]): void {
   for (const p of paths) {
     spawnDetached([sysbin.cmd(), "/d", "/c", RM_LOOP], { env: { HUB_RM: p }, verbatim: true });
+  }
+}
+
+/** The local roles file (never in the repository): null when there is none. */
+function readRolesFile(dataDir: string): string | null {
+  try {
+    return readFileSync(join(dataDir, "roles.json"), "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
   }
 }
 
@@ -210,6 +223,7 @@ export function realCliDeps(opts: {
     userProfile: process.env.USERPROFILE ?? homedir(),
   });
   const now = () => Date.now();
+  let loadRoles: (() => RolesConfig) | null = null;
   const daemonIdentity = (lock: LockInfo) =>
     identifyDaemon(
       lock,
@@ -253,6 +267,13 @@ export function realCliDeps(opts: {
             log.warn("relay_stray", { sessionId: s.sessionId, ts: s.ts }),
           ),
         expireSends,
+        mailUpkeep: (store, now, log) => {
+          loadRoles ??= rolesLoader(
+            () => readRolesFile(paths.dataDir),
+            (event) => log.warn(event),
+          );
+          return mailUpkeep(store, loadRoles(), now());
+        },
       }),
     runTui: opts.runTui,
     runBridge: opts.runBridge,
@@ -268,6 +289,21 @@ export function realCliDeps(opts: {
         err: (line) =>
           process.stderr.write(`${line}
 `),
+      }),
+    runMail: (cmd, args) =>
+      runMailCli(cmd, args, {
+        // The CLI never creates hub.db and never upgrades its schema: the daemon does both.
+        openStore: () =>
+          existsSync(paths.dbPath)
+            ? Store.open(paths.dbPath, { create: false, migrate: false })
+            : null,
+        readRoles: () => readRolesFile(paths.dataDir),
+        env: process.env,
+        now,
+        out: (line) => process.stdout.write(`${line}\n`),
+        err: (line) => process.stderr.write(`${line}\n`),
+        readInput: async (p) => (p === "-" ? await Bun.stdin.text() : readFileSync(p, "utf8")),
+        sleep: (ms) => Bun.sleep(ms),
       }),
     sleep: (ms) => Bun.sleep(ms),
   };

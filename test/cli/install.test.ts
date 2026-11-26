@@ -116,6 +116,7 @@ function makeDeps(over: Partial<CliDeps> = {}): CliDeps {
     runBridge: async () => 0,
     guardArgv: ["hub.exe", "relay-guard"],
     runRelayGuard: async () => 0,
+    runMail: async () => 0,
     sleep: async (ms) => advance(ms),
     ...over,
   };
