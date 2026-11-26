@@ -574,7 +574,6 @@ describe("send: relay guard", () => {
   });
 
   test("a claimed marker is logged as guard true and removed", async () => {
-    setEnv({ FAKE_RELAY_GUARD_CLAIM: "1" });
     const row = await send(
       { sessionId: "s1", text: "x" },
       deps({ log: { info: push, warn: push, error: push } }),
@@ -583,17 +582,35 @@ describe("send: relay guard", () => {
     expect(existsSync(join(relayDir, `guard-${row.id}.lock`))).toBe(false);
   });
 
-  test("a relay that never passed the guard is logged as guard false", async () => {
-    await send(
+  test("a relay that said DONE without the guard's claim is failed (fail closed)", async () => {
+    setEnv({ FAKE_RELAY_GUARD_CLAIM: "0", FAKE_RELAY_NO_DELIVERY: "1" });
+    const row = await send(
       { sessionId: "s1", text: "x" },
       deps({ log: { info: push, warn: push, error: push } }),
     );
+    expect(row.state).toBe("failed");
+    expect(row.detail).toContain("relay guard did not run");
+    expect(events[0]?.event).toBe("relay");
     expect(events[0]?.fields?.guard).toBe(false);
+    expect(events[0]?.fields?.ok).toBe(false);
+    expect(events[0]?.fields?.reason).toBe("no-guard");
+  });
+
+  test("a relay that failed on its own keeps its own reason, not no-guard", async () => {
+    setEnv({ FAKE_RELAY_GUARD_CLAIM: "0", FAKE_RELAY_EXIT: "3" });
+    const row = await send(
+      { sessionId: "s1", text: "x" },
+      deps({ log: { info: push, warn: push, error: push } }),
+    );
+    expect(row.state).toBe("failed");
+    expect(row.detail).not.toContain("relay guard did not run");
+    expect(events[0]?.fields?.reason).toBe("exit");
   });
 
   test("a leftover marker from a crashed run does not count as this run's claim", async () => {
+    setEnv({ FAKE_RELAY_GUARD_CLAIM: "0" });
     // A stale marker for this send's id, there before the relay starts (onCreated runs first).
-    await send(
+    const row = await send(
       { sessionId: "s1", text: "x" },
       deps({
         log: { info: push, warn: push, error: push },
@@ -601,6 +618,7 @@ describe("send: relay guard", () => {
       }),
     );
     expect(events[0]?.fields?.guard).toBe(false);
+    expect(row.state).toBe("failed");
   });
 });
 

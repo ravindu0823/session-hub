@@ -212,7 +212,7 @@ the pane shows its state and `o` is needed to override.
 | held | The session cannot take it yet: approve in the session's terminal |
 | delivered | The exact text was found in the recipient's transcript (if the relay dropped the header line or changed the line break after it, your text still matched byte for byte, and the detail says so) |
 | expired | Not delivered within 30 minutes |
-| failed | The relay reported an error; nothing is retried automatically, send again |
+| failed | The relay reported an error, or ran without its guard; nothing is retried automatically, send again |
 
 ### Mail between sessions
 
@@ -305,8 +305,9 @@ two turns, with a spend cap of USD 0.25 per run. It loads no settings from the p
 skills or commands and no MCP servers, so the profile's CLAUDE.md, plugins and hooks stay away from the relay model; only
 the login is used. One hook is passed on the command line: a PreToolUse guard (`hub relay-guard`) that allows exactly one
 `SendMessage`, to the session you chose, and blocks every other tool call, so whatever the text says, the relay cannot
-message another session or send twice. Its prompt treats the stdin text as data to deliver, never as instructions. It
-gets an allow-listed
+message another session or send twice. The guard fails closed: any error in it blocks the call, and a relay that
+reports DONE without the guard having allowed its one `SendMessage` is marked failed. Its prompt treats the stdin text
+as data to deliver, never as instructions. It gets an allow-listed
 environment (system paths, the user profile folders, temp and proxy settings, and `CLAUDE_CONFIG_DIR`), so no
 `ANTHROPIC_*` or `CLAUDE_CODE_*` variable can change where the text goes. It never uses `--restricted` and never changes
 `crossSessionInbound`. A relay message that matches no send to the session it landed in is counted

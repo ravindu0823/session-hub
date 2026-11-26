@@ -564,6 +564,15 @@ describe("relay-guard", () => {
     expect(guardRuns).toBe(1);
     expect(USAGE).toContain("hub relay-guard");
   });
+
+  test("any error in the guard blocks the tool call (exit 2, fail closed)", async () => {
+    const d = makeDeps();
+    d.runRelayGuard = async () => {
+      throw new Error("stdin closed");
+    };
+    expect(await runCli(["relay-guard"], d)).toBe(2);
+    expect(err.at(-1)).toBe("relay guard: stdin closed");
+  });
 });
 
 describe("mail commands", () => {

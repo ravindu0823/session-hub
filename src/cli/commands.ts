@@ -20,6 +20,7 @@ import {
 } from "../daemon/lock.ts";
 import { MAIL_COMMANDS } from "../mail/cli.ts";
 import type { Platform } from "../platform/types.ts";
+import { GUARD_BLOCK_EXIT } from "../send/guard.ts";
 import {
   describeBuild,
   formatManifest,
@@ -875,6 +876,12 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
   try {
     return await dispatch(argv, deps);
   } catch (e) {
+    // The relay's PreToolUse hook: Claude Code runs the tool call on any exit code but 2, so every
+    // error here must block it (fail closed), not return 1.
+    if (argv[0] === "relay-guard") {
+      deps.err(`relay guard: ${e instanceof Error ? e.message : String(e)}`);
+      return GUARD_BLOCK_EXIT;
+    }
     if (e instanceof UsageError) {
       deps.err(USAGE);
       return 2;

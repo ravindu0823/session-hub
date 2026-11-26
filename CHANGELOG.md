@@ -55,5 +55,6 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
 
 ### Security
 
+- Security fix. (#33)
 - Security fix. (#22)
 - Purged message text no longer stays readable in the SQLite WAL after a purge. (#10)

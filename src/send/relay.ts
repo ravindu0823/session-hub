@@ -217,6 +217,10 @@ function detail(summary: string): string {
   return maskSecrets(summary).slice(0, DETAIL_MAX);
 }
 
+/** Detail of a send whose relay said DONE but never passed the guard. */
+export const NO_GUARD_DETAIL =
+  "relay guard did not run; the message may still have arrived: check the session before sending again";
+
 /** The relay's reply starts with the word DONE (it may add a sentence, e.g. "DONE. Sent once to ..."). */
 const DONE_RE = /^DONE(?![\p{L}\p{N}_])/u;
 
@@ -369,9 +373,14 @@ export async function send(req: SendRequest, deps: SendDeps): Promise<SendRow> {
   }
   trace.wallMs = Math.round(performance.now() - t0);
   // A relay that reported DONE without the guard claiming the marker sent nothing through the guard:
-  // either nothing was sent, or the hook did not run. Logged; delivery is still proved from the transcript.
+  // either nothing was sent, or the hook did not run and the call went out unchecked. Fail closed:
+  // the send fails (the daemon may already have proved delivery; that state stays).
   trace.guard = existsSync(marker);
   rmSync(marker, { force: true });
+  if (failure === null && !trace.guard) {
+    failure = NO_GUARD_DETAIL;
+    trace.reason = "no-guard";
+  }
   trace.ok = failure === null;
   if (failure === null) deps.log?.info("relay", trace);
   else deps.log?.warn("relay", trace);
