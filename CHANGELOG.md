@@ -23,7 +23,7 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
   whose mail waits for a session; a read-only Decisions tab (key `4`) in the terminal app. Tray answers go through
   `hub bridge` once, are never retried, and are refused when the bridge runs inside a Claude Code session; open
   decisions count in the Waiting badge and the tray icon. The tray is started without the Claude Code session
-  variables. (#28)
+  variables. (#31)
 - Waiting items the owner already answered in the session's own terminal are marked answered and left
   out of the counts; owner messages typed while a session is busy are indexed; the tray has a Send button
   and Dismiss/Undo per item. (#14)
