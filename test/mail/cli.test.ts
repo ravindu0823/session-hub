@@ -395,8 +395,8 @@ describe("review fixes", () => {
   test("text output cleans every stored field, not only the body", async () => {
     const s = open();
     s.mail().insert({
-      thread: "T]0;x-1",
-      fromRole: "al[31mpha",
+      thread: "T\u001b]0;x\u0007-1",
+      fromRole: "al\u001b[31mpha",
       fromSession: null,
       toRole: "beta",
       kind: "task",
@@ -409,7 +409,7 @@ describe("review fixes", () => {
       thread: "T",
       fromRole: "alpha",
       fromSession: null,
-      toRole: "role",
+      toRole: "ro\u009ble",
       kind: "task",
       body: "b",
       evidence: null,
@@ -424,8 +424,8 @@ describe("review fixes", () => {
       fromSession: null,
       createdAt: 1,
     });
-    s.mail().answerDecision("D-0001", "ok", "tr[2Jay", 2);
-    s.upsertSession(session("s-bad", { name: "ba[2Jd name" }));
+    s.mail().answerDecision("D-0001", "ok", "tr\u001b[2Jay", 2);
+    s.upsertSession(session("s-bad", { name: "ba\u001b[2Jd name" }));
     const outs = [
       ...(await run("mail", ["inbox"], BETA)).out,
       ...(await run("decisions", [], {})).out,
