@@ -166,7 +166,8 @@ function agent(sessionId: string, over: Record<string, unknown> = {}): Record<st
 let seq = 0;
 function ts(): string {
   seq += 1;
-  return new Date(Date.UTC(2026, 10, 13, 8, 0, seq)).toISOString();
+  // Relative to the test clock: a fixed date drifts out of the 7-day window and gets purged.
+  return new Date(clock - 3_600_000 + seq * 1_000).toISOString();
 }
 /** `at`: the record's own time (epoch ms); default a fixed fixture time. */
 function userLine(uuid: string, text: string, at?: number): string {
@@ -644,7 +645,7 @@ describe("runDaemon", () => {
           type: "user",
           isSidechain: false,
           uuid: `big-${i}`,
-          timestamp: "2026-11-13T08:00:00.000Z",
+          timestamp: new Date(clock - 3_600_000).toISOString(),
           origin: { kind: "human" },
           message: { role: "user", content: `p${i}` },
           pad,
