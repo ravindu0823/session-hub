@@ -254,6 +254,24 @@ export class Store {
     return r ? toSession(r) : null;
   }
 
+  /** Name, profile and end time of every indexed session (for role lookups), without status. */
+  sessionIdentities(): {
+    sessionId: string;
+    name: string;
+    profile: string;
+    endedAt: number | null;
+  }[] {
+    const rows = this.db
+      .query("SELECT session_id, name, profile, ended_at FROM sessions ORDER BY session_id")
+      .all() as Row[];
+    return rows.map((r) => ({
+      sessionId: r.session_id as string,
+      name: r.name as string,
+      profile: r.profile as string,
+      endedAt: (r.ended_at as number | null) ?? null,
+    }));
+  }
+
   listSessions(): SessionView[] {
     const rows = this.db
       .query(
