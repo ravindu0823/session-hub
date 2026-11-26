@@ -53,8 +53,9 @@ if (args.includes("-p")) {
     };
     appendFileSync(env.FAKE_RELAY_LOG, `${JSON.stringify(line)}\n`);
   }
-  // FAKE_RELAY_GUARD_CLAIM=1: the guard hook allowed the one send and claimed this run's marker.
-  if (env.FAKE_RELAY_GUARD_CLAIM === "1" && env.SESSION_HUB_RELAY_MARKER) {
+  // The guard hook allowed the one send and claimed this run's marker, as a real relay does.
+  // FAKE_RELAY_GUARD_CLAIM=0: the relay ran without the guard (the hook never ran or never allowed).
+  if (env.FAKE_RELAY_GUARD_CLAIM !== "0" && env.SESSION_HUB_RELAY_MARKER) {
     writeFileSync(env.SESSION_HUB_RELAY_MARKER, "");
   }
   if (env.FAKE_TARGET_TRANSCRIPT && env.FAKE_RELAY_NO_DELIVERY !== "1") {
