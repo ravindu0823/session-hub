@@ -185,3 +185,26 @@ export function knownRoles(
   }
   return out;
 }
+
+/**
+ * For the daemon: reads the roles file on every call. An invalid or unreadable file gives the default
+ * timings and no roles, and `warn("roles_invalid")` runs once until the file is valid (or gone) again.
+ * The warning carries no file content.
+ */
+export function rolesLoader(
+  read: () => string | null,
+  warn: (event: string) => void,
+): () => RolesConfig {
+  let warned = false;
+  return () => {
+    try {
+      const cfg = parseRolesConfig(read());
+      warned = false;
+      return cfg;
+    } catch {
+      if (!warned) warn("roles_invalid");
+      warned = true;
+      return parseRolesConfig(null);
+    }
+  };
+}

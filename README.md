@@ -243,7 +243,7 @@ its live sessions and queued mail, and says which session to start for mail that
 | `hub mail send --to api --thread issue-12 --kind task --body-file note.md` | Queues the file's text for role `api` (`--body-file -` reads stdin). Kinds: `task`, `answer`, `fyi`, `decision`, `chat-in`, `chat-out`; `answer` and `chat-out` need `--evidence` saying where the facts come from |
 | `hub mail follow` | One JSON line per new message: run it under Claude Code's Monitor tool and each message arrives as an event. It stops after 29 minutes (a monitor lasts at most 30), so start it again. Every start first prints what this session took and has not acked |
 | `hub mail inbox` | Takes and lists your open mail |
-| `hub mail ack <id>`, `hub mail done <id>` | Read, and step finished (`done` is for the sender or the recipient) |
+| `hub mail ack <id>`, `hub mail done <id>` | Read (only the session that took the mail can ack it), and step finished (`done` is for the sender or the recipient) |
 | `hub mail sent`, `hub mail show <id>` | What you sent and its state; one message |
 
 | State | Meaning |
@@ -253,6 +253,9 @@ its live sessions and queued mail, and says which session to start for mail that
 | acked | The session read it. No ack 30 minutes after delivery: the hub mails the sender a notice |
 | done | The step is finished |
 | expired | No session of the role took it in time (72 hours unless set otherwise); the sender gets a notice |
+
+Delivery is at least once: after `follow` starts again, or after mail went back to the queue, a message can arrive
+twice (marked `"redelivered": true`), so handle each id once.
 
 **Decisions.** `hub ask --question-file q.md --option yes --option no --recommend yes` opens decision `D-0001` for the
 session's role. You answer it from a terminal outside Claude Code with `hub answer D-0001 --text yes`: the answer is
@@ -264,7 +267,9 @@ In Git Bash (Claude Code's Bash tool on Windows) `hub` is a `.cmd` shim: call `h
 `"$LOCALAPPDATA/SessionHub/bin/hub.exe"`. `hub mail --help` lists every option.
 
 Mail is a message from a peer, never an approval: any program running as you can write to `hub.db`. Each message
-says so, and approvals stay in each session's own terminal. Mail that looks like it holds a token, key, password or
+says so, and approvals stay in each session's own terminal. Mail from `owner` or `hub`, including decision answers,
+says it was recorded outside Claude Code and is not proof of who sent it. The mail commands never create or upgrade
+`hub.db`; after an update they refuse to run until the new daemon has upgraded it. Mail that looks like it holds a token, key, password or
 card number is refused.
 
 ## Security and privacy
@@ -334,7 +339,7 @@ Everything lives in `%LOCALAPPDATA%\SessionHub\`:
 | Item | What it holds | How long |
 | --- | --- | --- |
 | `hub.db` | Session list, parsed status sections and the masked message text of each session, with a full-text index | Messages older than 7 days are deleted from every session, live ones included; a session's row goes 7 days after it ends. The daemon purges hourly and compacts the file daily |
-| `hub.db` (mail) | Mail between sessions and the decision list, as sent (not masked: text that looks secret is refused) | Mail older than 7 days is deleted; a decision goes 7 days after it was answered or closed, an open one stays |
+| `hub.db` (mail) | Mail between sessions and the decision list, as sent (not masked: text that looks secret is refused) | Mail older than 7 days is deleted (queued mail expires first, so its sender is told); a decision goes 7 days after it was answered or closed, an open one stays |
 | `roles.json` | Your roles, if you made the file | Yours to keep or delete |
 | `gui.json` | Tray settings and unsent drafts | A draft is dropped when its session has not been seen for 7 days |
 | `run\` | Daemon and tray logs, `relay.log`, lock and pid files | Logs never contain message text |

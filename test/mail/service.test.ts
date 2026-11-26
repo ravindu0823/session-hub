@@ -163,6 +163,20 @@ describe("sendMail", () => {
     expect(m.evidence).toBe("a.ts:3");
   });
 
+  test("the owner (no session) has the same per-minute cap", () => {
+    const owner: Caller = { role: "owner", sessionId: null };
+    for (let i = 0; i < MAX_MAIL_PER_MINUTE; i++) sendMail(store, cfg, owner, base, 1_000 + i);
+    expect(refusal(() => sendMail(store, cfg, owner, base, 2_000))).toBe("rate-limited");
+  });
+
+  test("a thread that looks like a secret is refused", () => {
+    expect(
+      refusal(() =>
+        sendMail(store, cfg, alpha, { ...base, thread: "sk-abcdefghijklmnopqrstuvwxyz012345" }, 1),
+      ),
+    ).toBe("looks-secret");
+  });
+
   test("one session may send at most the per-minute cap", () => {
     for (let i = 0; i < MAX_MAIL_PER_MINUTE; i++) sendMail(store, cfg, alpha, base, 1_000 + i);
     expect(refusal(() => sendMail(store, cfg, alpha, base, 2_000))).toBe("rate-limited");
@@ -189,7 +203,7 @@ describe("answerAndNotify", () => {
       toRole: "alpha",
       kind: "decision",
       thread: d.id,
-      body: "D-0001 answered by the owner: yes",
+      body: "D-0001 answered: yes (recorded via tray, outside Claude Code; not proof of who sent it)",
     });
   });
 
@@ -213,8 +227,8 @@ describe("answerAndNotify", () => {
       .inbox("alpha")
       .map((m) => m.body);
     expect(bodies).toEqual([
-      "D-0001 answered by the owner: yes",
-      "D-0001 changed by the owner: no (was: yes)",
+      "D-0001 answered: yes (recorded via tray, outside Claude Code; not proof of who sent it)",
+      "D-0001 answer changed: no (was: yes; recorded via cli, outside Claude Code; not proof of who sent it)",
     ]);
   });
 

@@ -84,7 +84,7 @@ describe("mail", () => {
     ms.insert(mail({ body: "one" }));
     ms.insert(mail({ body: "two" }));
     ms.claim("beta", "s-beta", 20_000);
-    ms.ack(1, "beta", 21_000);
+    ms.ack(1, "beta", "s-beta", 21_000);
     expect(ms.unackedFor("s-beta").map((m) => m.body)).toEqual(["two"]);
     expect(ms.unackedFor("s-other")).toEqual([]);
   });
@@ -92,14 +92,26 @@ describe("mail", () => {
   test("ack is only for the recipient role and only once", () => {
     const ms = store.mail();
     ms.insert(mail());
-    expect(ms.ack(1, "beta", 15_000)).toBe("not-delivered");
+    expect(ms.ack(1, "beta", "s-beta", 15_000)).toBe("not-delivered");
     ms.claim("beta", "s-beta", 20_000);
-    expect(ms.ack(1, "alpha", 21_000)).toBe("not-yours");
-    expect(ms.ack(2, "beta", 21_000)).toBe("not-found");
-    expect(ms.ack(1, "beta", 22_000)).toBe("ok");
+    expect(ms.ack(1, "alpha", "s-alpha", 21_000)).toBe("not-yours");
+    expect(ms.ack(2, "beta", "s-beta", 21_000)).toBe("not-found");
+    expect(ms.ack(1, "beta", "s-beta", 22_000)).toBe("ok");
     expect(ms.get(1)?.state).toBe("acked");
     expect(ms.get(1)?.ackedAt).toBe(22_000);
-    expect(ms.ack(1, "beta", 23_000)).toBe("already");
+    expect(ms.ack(1, "beta", "s-beta", 23_000)).toBe("already");
+  });
+
+  test("only the session the mail was delivered to may ack it; the owner acks mail it took", () => {
+    const ms = store.mail();
+    ms.insert(mail());
+    ms.insert(mail({ toRole: "owner" }));
+    ms.claim("beta", "s-beta", 20_000);
+    ms.claim("owner", null, 20_000);
+    expect(ms.ack(1, "beta", "s-beta-2", 21_000)).toBe("other-session");
+    expect(ms.get(1)?.state).toBe("delivered");
+    expect(ms.ack(1, "beta", "s-beta", 22_000)).toBe("ok");
+    expect(ms.ack(2, "owner", null, 22_000)).toBe("ok");
   });
 
   test("done closes mail for its sender or recipient; queued mail can be closed too", () => {
@@ -120,7 +132,7 @@ describe("mail", () => {
     ms.insert(mail({ body: "queued" }));
     ms.insert(mail({ body: "acked" }));
     ms.claim("beta", "s-beta", 20_000);
-    ms.ack(2, "beta", 21_000);
+    ms.ack(2, "beta", "s-beta", 21_000);
     ms.insert(mail({ body: "new" }));
     expect(ms.inbox("beta").map((m) => m.body)).toEqual(["queued", "new"]);
     expect(ms.inbox("beta", { all: true }).map((m) => m.body)).toEqual(["queued", "acked", "new"]);
@@ -177,7 +189,7 @@ describe("mail upkeep", () => {
     ms.insert(mail());
     ms.insert(mail());
     ms.claim("beta", "s-beta", 20);
-    ms.ack(2, "beta", 21);
+    ms.ack(2, "beta", "s-beta", 21);
     ms.insert(mail());
     ms.claim("beta", "s-live", 22);
     store.markEnded("s-beta", 30);
@@ -309,6 +321,7 @@ describe("retention", () => {
     const now = 30 * day;
     ms.insert(mail({ createdAt: now - 8 * day, expiresAt: now }));
     ms.insert(mail({ createdAt: now - day, expiresAt: now }));
+    ms.done(1, "alpha", now - 8 * day);
     const base = { role: "alpha", question: "q", options: [], recommendation: null };
     ms.createDecision({ ...base, fromSession: null, createdAt: now - 9 * day });
     ms.createDecision({ ...base, fromSession: null, createdAt: now - 9 * day });
@@ -318,5 +331,55 @@ describe("retention", () => {
     expect(ms.get(2)).not.toBeNull();
     expect(ms.getDecision("D-0001")?.state).toBe("open");
     expect(ms.getDecision("D-0002")).toBeNull();
+  });
+});
+
+describe("ids and retention (review)", () => {
+  const day = 86_400_000;
+  const base = {
+    role: "alpha",
+    question: "q",
+    options: [],
+    recommendation: null,
+    fromSession: null,
+  };
+
+  test("a decision id is never reused after the newest decision is purged", () => {
+    const ms = store.mail();
+    ms.createDecision({ ...base, createdAt: 0 });
+    ms.createDecision({ ...base, createdAt: 0 });
+    ms.answerDecision("D-0002", "ok", "cli", 1);
+    store.purge(10 * day);
+    expect(ms.getDecision("D-0002")).toBeNull();
+    expect(ms.createDecision({ ...base, createdAt: 10 * day }).id).toBe("D-0003");
+  });
+
+  test("a mail id is never reused after the newest mail is purged", () => {
+    const ms = store.mail();
+    ms.insert(mail({ createdAt: 0, expiresAt: 1 }));
+    ms.done(1, "alpha", 2);
+    store.purge(10 * day);
+    expect(ms.get(1)).toBeNull();
+    expect(ms.insert(mail({ createdAt: 10 * day, expiresAt: 11 * day })).id).toBe(2);
+  });
+
+  test("a decision closed without an answer goes 7 days after it was closed", () => {
+    const ms = store.mail();
+    ms.createDecision({ ...base, createdAt: 0 });
+    ms.closeDecision("D-0001", "alpha", 5 * day);
+    store.purge(11 * day);
+    expect(ms.getDecision("D-0001")?.state).toBe("closed");
+    store.purge(12 * day + 1);
+    expect(ms.getDecision("D-0001")).toBeNull();
+  });
+
+  test("queued mail is not purged before the upkeep expired it (and told its sender)", () => {
+    const ms = store.mail();
+    ms.insert(mail({ createdAt: 0, expiresAt: 7 * day }));
+    store.purge(8 * day);
+    expect(ms.get(1)?.state).toBe("queued");
+    ms.expireQueued(8 * day);
+    store.purge(8 * day);
+    expect(ms.get(1)).toBeNull();
   });
 });

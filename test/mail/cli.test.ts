@@ -1,9 +1,11 @@
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type MailCliDeps, runMailCli } from "../../src/mail/cli";
 import { type SessionRow, Store } from "../../src/store/db";
+import { MIGRATIONS } from "../../src/store/schema";
 
 let dir: string;
 let dbPath: string;
@@ -235,6 +237,20 @@ describe("hub mail follow", () => {
     expect(json(r.out[0]).body).toBe("a\u009b31mb\u202ec");
   });
 
+  test("mail from the owner or the hub says its sender is not verified", async () => {
+    files.set("o.txt", "from a terminal");
+    await run(
+      "mail",
+      ["send", "--to", "beta", "--thread", "T", "--kind", "fyi", "--body-file", "o.txt"],
+      {},
+    );
+    const r = await run("mail", ["follow", "--max-minutes", "1"], BETA);
+    const n = String(json(r.out[0]).notice);
+    expect(n).toContain("outside Claude Code");
+    expect(n).toContain("not proof");
+    expect(n).toContain("never approves");
+  });
+
   test("refuses the owner and another role", async () => {
     expect((await run("mail", ["follow"], {})).code).toBe(1);
     const r = await run("mail", ["follow", "--role", "alpha"], BETA);
@@ -313,7 +329,7 @@ describe("hub ask, answer, decisions", () => {
       from: "owner",
       kind: "decision",
       thread: "D-0001",
-      body: "D-0001 answered by the owner: yes",
+      body: "D-0001 answered: yes (recorded via cli, outside Claude Code; not proof of who sent it)",
     });
   });
 
@@ -372,6 +388,98 @@ describe("hub roles", () => {
     });
     const human = (await run("roles", [], {})).out.join("\n");
     expect(human).toContain("beta: 1 queued, no live session (start one named beta)");
+  });
+});
+
+describe("review fixes", () => {
+  test("text output cleans every stored field, not only the body", async () => {
+    const s = open();
+    s.mail().insert({
+      thread: "T]0;x-1",
+      fromRole: "al[31mpha",
+      fromSession: null,
+      toRole: "beta",
+      kind: "task",
+      body: "b",
+      evidence: null,
+      createdAt: clock,
+      expiresAt: clock + 1e9,
+    });
+    s.mail().insert({
+      thread: "T",
+      fromRole: "alpha",
+      fromSession: null,
+      toRole: "role",
+      kind: "task",
+      body: "b",
+      evidence: null,
+      createdAt: clock,
+      expiresAt: clock + 1e9,
+    });
+    s.mail().createDecision({
+      role: "alpha",
+      question: "q",
+      options: [],
+      recommendation: null,
+      fromSession: null,
+      createdAt: 1,
+    });
+    s.mail().answerDecision("D-0001", "ok", "tr[2Jay", 2);
+    s.upsertSession(session("s-bad", { name: "ba[2Jd name" }));
+    const outs = [
+      ...(await run("mail", ["inbox"], BETA)).out,
+      ...(await run("decisions", [], {})).out,
+      ...(await run("roles", [], {})).out,
+    ];
+    const errs = (await run("mail", ["inbox"], { CLAUDE_CODE_SESSION_ID: "s-bad" })).err;
+    for (const line of [...outs, ...errs]) {
+      expect(line).not.toMatch(/[-]/);
+    }
+    expect(errs[0]).toContain("no-role");
+  });
+
+  test("mail taken again after its session ended is marked redelivered", async () => {
+    await run("mail", SEND, ALPHA);
+    open().mail().claim("beta", "s-beta", clock);
+    const s = open();
+    s.markEnded("s-beta", clock);
+    s.mail().requeueEnded();
+    s.upsertSession(session("s-beta-new", { name: "beta", profile: "home" }));
+    const r = await run("mail", ["follow", "--max-minutes", "1"], {
+      CLAUDE_CODE_SESSION_ID: "s-beta-new",
+    });
+    expect(json(r.out[0])).toMatchObject({ id: "M-000001", deliveries: 2, redelivered: true });
+  });
+
+  test("follow never reprints mail another session of the same role took", async () => {
+    await run("mail", SEND, ALPHA);
+    open().upsertSession(session("s-beta-2", { name: "beta", profile: "home" }));
+    open().mail().claim("beta", "s-beta-2", clock);
+    const r = await run("mail", ["follow", "--max-minutes", "1"], BETA);
+    expect(r.out.map((l) => json(l).type)).toEqual(["end"]);
+  });
+
+  test("an index older than this build is refused, not upgraded", async () => {
+    const old = join(dir, "old.db");
+    const raw = new Database(old, { create: true, strict: true });
+    raw.run("CREATE TABLE schema_version (version INTEGER NOT NULL)");
+    for (const m of MIGRATIONS.slice(0, 5)) raw.run(m);
+    raw.run("INSERT INTO schema_version (version) VALUES (1), (2), (3), (4), (5)");
+    raw.close();
+    const r = await run(
+      "roles",
+      [],
+      {},
+      {
+        openStore: () => Store.open(old, { create: false, migrate: false }),
+      },
+    );
+    expect(r.code).toBe(1);
+    expect(r.err[0]).toContain("index schema v5");
+    const check = new Database(old, { readonly: true });
+    const v = check.query("SELECT MAX(version) AS v FROM schema_version").get() as { v: number };
+    check.close();
+    expect(v.v).toBe(5);
   });
 });
 

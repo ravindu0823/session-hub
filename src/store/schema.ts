@@ -147,8 +147,8 @@ DELETE FROM messages
      OR text LIKE '<local-command-stderr>%'
      OR text LIKE 'This session is being continued from a previous conversation%');
 `,
-  // v6: mail between sessions, addressed by role (src/mail), and the owner's decision list. The ids
-  // never repeat (AUTOINCREMENT), so "M-000417" names one message for good, purged or not.
+  // v6: mail between sessions, addressed by role (src/mail), and the owner's decision list. Both ids
+  // never repeat (AUTOINCREMENT), so "M-000417" and "D-0031" name one item for good, purged or not.
   `
 CREATE TABLE mail (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,8 +176,8 @@ CREATE INDEX mail_state ON mail(state, id);
 CREATE INDEX mail_created ON mail(created_at);
 
 CREATE TABLE decisions (
-  id TEXT PRIMARY KEY,
-  seq INTEGER NOT NULL UNIQUE,
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT NOT NULL UNIQUE,
   role TEXT NOT NULL,
   question TEXT NOT NULL,
   options_json TEXT NOT NULL,
@@ -188,6 +188,7 @@ CREATE TABLE decisions (
   answered_via TEXT,
   conflicts_json TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER NOT NULL,
+  closed_at INTEGER,
   from_session TEXT
 );
 CREATE INDEX decisions_state ON decisions(state, seq);

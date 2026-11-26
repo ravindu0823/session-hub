@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { RETENTION_MS } from "../../src/config";
 import {
   ANSWERS_SQL,
+  IndexOutdated,
   type MessageRow,
   type SendRow,
   type SessionRow,
@@ -566,6 +567,19 @@ describe("migrations", () => {
     raw.close();
     expect(row.v).toBe(MIGRATIONS.length);
     expect(MIGRATIONS.length).toBe(6);
+  });
+
+  test("migrate:false opens a current index and refuses an older one without touching it", () => {
+    Store.open(dbPath).close();
+    expect(() => Store.open(dbPath, { migrate: false }).close()).not.toThrow();
+    const older = join(dir, "older.db");
+    const raw = new Database(older, { create: true, strict: true });
+    raw.run("CREATE TABLE schema_version (version INTEGER NOT NULL)");
+    raw.run(MIGRATIONS[0] as string);
+    raw.run("INSERT INTO schema_version (version) VALUES (1)");
+    raw.close();
+    expect(() => Store.open(older, { migrate: false })).toThrow(IndexOutdated);
+    expect(() => Store.open(join(dir, "fresh.db"), { migrate: false })).toThrow(IndexOutdated);
   });
 
   test("v6 adds empty mail and decision tables to a v5 index and keeps its data", () => {

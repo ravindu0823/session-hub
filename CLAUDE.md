@@ -104,12 +104,14 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   A deliberate stop (`hub daemon stop`, install, uninstall) writes `run\daemon.stopped` first so it is not
   undone; every daemon run removes it.
 - Third-party callers: none. The app has no inbound endpoint, webhook or deploy hook, so SEC-06 has nothing to cover.
-  Its only inputs are local files written by Claude Code and the tray's stdin/stdout bridge child.
+  Its only inputs are local files written by Claude Code, the tray's stdin/stdout bridge child, and the `hub mail`,
+  `hub ask` and `hub answer` commands that local sessions and the owner run.
 
 ## Target architecture
-- Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index; the TUI and the `hub bridge` child of
-  the tray read it. No network, no services, no cloud. Deploy target: `hub install` on the owner's PC from a
-  reviewed build; each release needs a passing Windows test report (`scripts/test-windows-report.ps1`) and a
+- Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index and owns its schema; the TUI and the
+  `hub bridge` child of the tray read it. `hub mail`, `hub ask` and `hub answer` write only the mail and decision
+  tables, and refuse an index at an older schema instead of upgrading it. No network, no services, no cloud. Deploy
+  target: `hub install` on the owner's PC from a reviewed build; each release needs a passing Windows test report (`scripts/test-windows-report.ps1`) and a
   passing `bun run relay-eval` in each profile (real relays to throwaway `sh-eval-*` background sessions; the report
   script runs `relay-eval --check`, which fails until both profiles have a PASS report for the current relay command
   and prompt, made with the installed Claude Code version, at most 30 days old).

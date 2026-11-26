@@ -33,7 +33,7 @@ export interface DaemonRunDeps {
   /** Expires overdue sends; returns how many. */
   expireSends(store: Store, now: () => number): number;
   /** Mail upkeep (requeue, expire, flag); absent in tests that do not need it. */
-  mailUpkeep?(store: Store, now: () => number): UpkeepResult;
+  mailUpkeep?(store: Store, now: () => number, log: Logger): UpkeepResult;
   runDaemon?: (deps: DaemonDeps) => Promise<void>;
   /** Signal and process-failure events (default: process). */
   signals?: {
@@ -59,7 +59,7 @@ export function upkeepTick(
   }
   if (deps.mailUpkeep === undefined) return;
   try {
-    const r = deps.mailUpkeep(store, deps.now);
+    const r = deps.mailUpkeep(store, deps.now, log);
     if (r.expired + r.requeued + r.flagged > 0) {
       log.info("mail_upkeep", { expired: r.expired, requeued: r.requeued, flagged: r.flagged });
     }

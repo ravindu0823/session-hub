@@ -8,6 +8,7 @@ import {
   parseRolesConfig,
   RolesConfigError,
   roleOfSession,
+  rolesLoader,
 } from "../../src/mail/roles";
 
 describe("isRoleName", () => {
@@ -149,5 +150,33 @@ describe("knownRoles", () => {
       { name: "two words", profile: "work" },
     ]);
     expect([...roles].sort()).toEqual(["lead", "owner", "web"]);
+  });
+});
+
+describe("rolesLoader", () => {
+  test("reads the file on every call; an invalid or unreadable file gives the defaults and warns once", () => {
+    let text: string | null = JSON.stringify({ roles: [{ role: "web" }] });
+    let fail = false;
+    const warnings: string[] = [];
+    const load = rolesLoader(
+      () => {
+        if (fail) throw new Error("EACCES");
+        return text;
+      },
+      (event) => warnings.push(event),
+    );
+    expect(load().roles).toHaveLength(1);
+    text = "{";
+    expect(load().roles).toEqual([]);
+    expect(load().expiryMs).toBe(DEFAULT_EXPIRY_MS);
+    fail = true;
+    expect(load().roles).toEqual([]);
+    expect(warnings).toEqual(["roles_invalid"]);
+    fail = false;
+    text = null;
+    expect(load().roles).toEqual([]);
+    text = "[]";
+    load();
+    expect(warnings).toEqual(["roles_invalid", "roles_invalid"]);
   });
 });

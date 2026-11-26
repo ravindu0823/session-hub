@@ -10,7 +10,7 @@ import { identifyDaemon, type LockInfo } from "../daemon/lock.ts";
 import { createLogger } from "../daemon/log.ts";
 import { realClaudeCli } from "../discovery/agents.ts";
 import { runMailCli } from "../mail/cli.ts";
-import { parseRolesConfig, type RolesConfig } from "../mail/roles.ts";
+import { type RolesConfig, rolesLoader } from "../mail/roles.ts";
 import { mailUpkeep } from "../mail/service.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
@@ -108,15 +108,6 @@ function readRolesFile(dataDir: string): string | null {
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw e;
-  }
-}
-
-/** The daemon keeps its upkeep going on the default timings while roles.json is unreadable or invalid. */
-function rolesOrDefaults(dataDir: string): RolesConfig {
-  try {
-    return parseRolesConfig(readRolesFile(dataDir));
-  } catch {
-    return parseRolesConfig(null);
   }
 }
 
@@ -232,6 +223,7 @@ export function realCliDeps(opts: {
     userProfile: process.env.USERPROFILE ?? homedir(),
   });
   const now = () => Date.now();
+  let loadRoles: (() => RolesConfig) | null = null;
   const daemonIdentity = (lock: LockInfo) =>
     identifyDaemon(
       lock,
@@ -275,7 +267,13 @@ export function realCliDeps(opts: {
             log.warn("relay_stray", { sessionId: s.sessionId, ts: s.ts }),
           ),
         expireSends,
-        mailUpkeep: (store, now) => mailUpkeep(store, rolesOrDefaults(paths.dataDir), now()),
+        mailUpkeep: (store, now, log) => {
+          loadRoles ??= rolesLoader(
+            () => readRolesFile(paths.dataDir),
+            (event) => log.warn(event),
+          );
+          return mailUpkeep(store, loadRoles(), now());
+        },
       }),
     runTui: opts.runTui,
     runBridge: opts.runBridge,
@@ -294,9 +292,11 @@ export function realCliDeps(opts: {
       }),
     runMail: (cmd, args) =>
       runMailCli(cmd, args, {
-        // create:false and the existence check: the CLI never creates hub.db (the daemon does).
+        // The CLI never creates hub.db and never upgrades its schema: the daemon does both.
         openStore: () =>
-          existsSync(paths.dbPath) ? Store.open(paths.dbPath, { create: false }) : null,
+          existsSync(paths.dbPath)
+            ? Store.open(paths.dbPath, { create: false, migrate: false })
+            : null,
         readRoles: () => readRolesFile(paths.dataDir),
         env: process.env,
         now,

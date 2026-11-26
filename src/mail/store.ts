@@ -58,9 +58,16 @@ export interface DecisionRow extends NewDecision {
   answeredVia: string | null;
   /** Answers that were not applied (a different second answer) or were replaced. */
   conflicts: DecisionConflict[];
+  closedAt: number | null;
 }
 
-export type MailChange = "ok" | "not-found" | "not-yours" | "not-delivered" | "already";
+export type MailChange =
+  | "ok"
+  | "not-found"
+  | "not-yours"
+  | "not-delivered"
+  | "other-session"
+  | "already";
 export type AnswerResult = "answered" | "same" | "conflict" | "replaced" | "not-found" | "closed";
 
 /** Mail claimed per read: a session's backlog arrives in batches of this size. */
@@ -108,6 +115,7 @@ function toDecision(r: Row): DecisionRow {
     answeredVia: str(r.answered_via),
     conflicts: JSON.parse(r.conflicts_json as string) as DecisionConflict[],
     createdAt: r.created_at as number,
+    closedAt: num(r.closed_at),
     fromSession: str(r.from_session),
   };
 }
@@ -189,15 +197,24 @@ export class MailStore {
     return rows.map(toMail);
   }
 
-  ack(id: number, role: string, now: number): MailChange {
+  /**
+   * The recipient read it. Only the session the mail was delivered to may ack it (null: the owner,
+   * who takes mail without a session), so another session of the same role cannot hide it from the
+   * session that has it.
+   */
+  ack(id: number, role: string, sessionId: string | null, now: number): MailChange {
     const m = this.get(id);
     if (!m) return "not-found";
     if (m.toRole !== role) return "not-yours";
     if (m.state === "queued") return "not-delivered";
     if (m.state !== "delivered") return "already";
+    if (m.deliveredSession !== sessionId) return "other-session";
     const r = this.db
-      .query("UPDATE mail SET state = 'acked', acked_at = ? WHERE id = ? AND state = 'delivered'")
-      .run(now, id);
+      .query(
+        `UPDATE mail SET state = 'acked', acked_at = ? WHERE id = ? AND state = 'delivered'
+           AND delivered_session IS ?`,
+      )
+      .run(now, id, sessionId);
     return r.changes > 0 ? "ok" : "already";
   }
 
@@ -236,6 +253,17 @@ export class MailStore {
     const r = this.db
       .query("SELECT COUNT(*) AS n FROM mail WHERE from_session = ? AND created_at >= ?")
       .get(fromSession, since) as { n: number };
+    return r.n;
+  }
+
+  /** Mail a role sent without a session (the owner, outside Claude Code) since `since`. */
+  countSentByRoleSince(fromRole: string, since: number): number {
+    const r = this.db
+      .query(
+        `SELECT COUNT(*) AS n FROM mail WHERE from_role = ? AND from_session IS NULL
+           AND created_at >= ?`,
+      )
+      .get(fromRole, since) as { n: number };
     return r.n;
   }
 
@@ -294,9 +322,12 @@ export class MailStore {
   createDecision(d: NewDecision): DecisionRow {
     return this.db
       .transaction(() => {
-        const r = this.db.query("SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM decisions").get() as {
-          n: number;
-        };
+        // The AUTOINCREMENT high-water mark, not MAX(seq): a purged decision's id is never handed out again.
+        const r = this.db
+          .query(
+            "SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'decisions'), 0) + 1 AS n",
+          )
+          .get() as { n: number };
         const row = this.db
           .query(
             `INSERT INTO decisions (id, seq, role, question, options_json, recommendation, state,
@@ -382,23 +413,28 @@ export class MailStore {
   }
 
   /** The owning role closes its decision. */
-  closeDecision(id: string, role: string, _now: number): MailChange {
+  closeDecision(id: string, role: string, now: number): MailChange {
     const d = this.getDecision(id);
     if (!d) return "not-found";
     if (d.role !== role) return "not-yours";
     const r = this.db
-      .query("UPDATE decisions SET state = 'closed' WHERE id = ? AND state <> 'closed'")
-      .run(id);
+      .query(
+        "UPDATE decisions SET state = 'closed', closed_at = ? WHERE id = ? AND state <> 'closed'",
+      )
+      .run(now, id);
     return r.changes > 0 ? "ok" : "already";
   }
 
-  /** Retention: mail older than the cutoff, and settled decisions last touched before it. */
+  /**
+   * Retention: mail older than the cutoff, except queued mail (the upkeep expires it first, so its
+   * sender is told), and settled decisions closed or answered before the cutoff.
+   */
   purge(cutoff: number): void {
-    this.db.query("DELETE FROM mail WHERE created_at < ?").run(cutoff);
+    this.db.query("DELETE FROM mail WHERE created_at < ? AND state <> 'queued'").run(cutoff);
     this.db
       .query(
         `DELETE FROM decisions WHERE state <> 'open'
-           AND COALESCE(answered_at, created_at) < ?`,
+           AND COALESCE(closed_at, answered_at, created_at) < ?`,
       )
       .run(cutoff);
   }

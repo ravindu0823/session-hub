@@ -65,7 +65,7 @@ export const MAX_MAIL_PER_MINUTE = 30;
 const RATE_WINDOW_MS = 60_000;
 const CALLER_POLL_MS = 500;
 
-/** A thread names a decision or work item: "D-0031", "PUSH-TEST", "issue#12". */
+/** A thread names a decision or work item: "D-0031", "release-3", "issue#12". */
 const THREAD_RE = /^[A-Za-z0-9][A-Za-z0-9._:#/-]{0,63}$/;
 
 /** Kinds whose sender must say where the facts come from. */
@@ -187,7 +187,11 @@ export function sendMail(
   if (evidence !== null && evidence.length > MAX_EVIDENCE_CHARS) {
     throw new MailRefused("too-long", `evidence over ${MAX_EVIDENCE_CHARS} characters`);
   }
-  if (looksSecret(req.body) || (evidence !== null && looksSecret(evidence))) {
+  if (
+    looksSecret(req.body) ||
+    looksSecret(req.thread) ||
+    (evidence !== null && looksSecret(evidence))
+  ) {
     throw new MailRefused("looks-secret", "never put tokens, keys or passwords in mail");
   }
   let ttlMs = cfg.expiryMs;
@@ -199,10 +203,12 @@ export function sendMail(
   }
   const mail = store.mail();
   return store.tx(() => {
-    if (
-      caller.sessionId !== null &&
-      mail.countSentSince(caller.sessionId, now - RATE_WINDOW_MS) >= MAX_MAIL_PER_MINUTE
-    ) {
+    const since = now - RATE_WINDOW_MS;
+    const sent =
+      caller.sessionId === null
+        ? mail.countSentByRoleSince(caller.role, since)
+        : mail.countSentSince(caller.sessionId, since);
+    if (sent >= MAX_MAIL_PER_MINUTE) {
       throw new MailRefused("rate-limited", `at most ${MAX_MAIL_PER_MINUTE} per minute`);
     }
     return mail.insert({
@@ -285,11 +291,14 @@ export function answerAndNotify(
   return store.tx(() => {
     const r = mail.answerDecision(id, answer, via, now, opts);
     if ((r.result === "answered" || r.result === "replaced") && r.row !== null) {
+      // Anything running as the owner's user can write hub.db, so the mail says how the answer was
+      // recorded, never that the owner sent it.
       const was = r.row.conflicts.at(-1)?.answer;
+      const how = `recorded via ${via}, outside Claude Code; not proof of who sent it`;
       const body =
         r.result === "answered"
-          ? `${id} answered by the owner: ${answer}`
-          : `${id} changed by the owner: ${answer} (was: ${was ?? ""})`;
+          ? `${id} answered: ${answer} (${how})`
+          : `${id} answer changed: ${answer} (was: ${was ?? ""}; ${how})`;
       mail.insert({
         thread: id,
         fromRole: OWNER_ROLE,

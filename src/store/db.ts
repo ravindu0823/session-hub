@@ -146,6 +146,19 @@ function toSend(r: Row): SendRow {
   };
 }
 
+/** The index is at an older schema and the caller asked not to upgrade it (`migrate: false`). */
+export class IndexOutdated extends Error {
+  constructor(
+    readonly found: number,
+    readonly wanted: number,
+  ) {
+    super(
+      `index schema v${found} is older than this build (v${wanted}); install this build (hub install) so the daemon upgrades it`,
+    );
+    this.name = "IndexOutdated";
+  }
+}
+
 /** Messages deleted per write transaction by purge. */
 const PURGE_BATCH = 500;
 
@@ -156,7 +169,7 @@ export class Store {
    * Opens the index file, creating it when missing unless `create` is false (then a missing file
    * throws). The caller ensures the directory exists.
    */
-  static open(path: string, opts: { create?: boolean } = {}): Store {
+  static open(path: string, opts: { create?: boolean; migrate?: boolean } = {}): Store {
     const create = opts.create ?? true;
     const db = new Database(path, { create, readwrite: true, strict: true });
     db.run("PRAGMA busy_timeout = 5000");
@@ -170,12 +183,31 @@ export class Store {
     // Freed pages are zeroed, so deleted message text cannot be read back from the file (PII-03).
     db.run("PRAGMA secure_delete = ON");
     try {
-      Store.migrate(db);
+      if (opts.migrate === false) Store.requireCurrent(db);
+      else Store.migrate(db);
     } catch (e) {
       db.close();
       throw e;
     }
     return new Store(db);
+  }
+
+  /**
+   * For writers other than the daemon (`hub mail`): an index at an older schema stays as it is, since
+   * an older installed daemon or bridge would refuse to open it once upgraded. Throws IndexOutdated.
+   */
+  private static requireCurrent(db: Database): void {
+    const has = db
+      .query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'")
+      .get();
+    const row = has
+      ? (db.query("SELECT MAX(version) AS v FROM schema_version").get() as { v: number | null })
+      : { v: null };
+    const current = row.v ?? 0;
+    if (current < MIGRATIONS.length) throw new IndexOutdated(current, MIGRATIONS.length);
+    if (current > MIGRATIONS.length) {
+      throw new Error(`index schema v${current} is newer than this build (v${MIGRATIONS.length})`);
+    }
   }
 
   private static migrate(db: Database): void {
