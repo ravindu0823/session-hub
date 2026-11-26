@@ -319,12 +319,17 @@ export interface UpkeepResult {
   expired: number;
   requeued: number;
   flagged: number;
+  closed: number;
 }
+
+/** An open decision nobody answered is closed after this long, so retention can remove it (PII-03). */
+export const OPEN_DECISION_MAX_MS = 30 * 86_400_000;
 
 /**
  * The daemon's pass: delivered mail of ended sessions goes back to the queue; queued mail past its
- * expiry expires; delivered mail unacknowledged after the timeout is flagged. Expired and flagged
- * mail each tell their sender once, by mail from the hub (never about the hub's own mail).
+ * expiry expires; delivered mail unacknowledged after the timeout is flagged; an open decision older
+ * than OPEN_DECISION_MAX_MS is closed. Expired and flagged mail each tell their sender once, and a
+ * closed decision its role, by mail from the hub (never about the hub's own mail).
  */
 export function mailUpkeep(store: Store, cfg: RolesConfig, now: number): UpkeepResult {
   const mail = store.mail();
@@ -332,6 +337,7 @@ export function mailUpkeep(store: Store, cfg: RolesConfig, now: number): UpkeepR
     const requeued = mail.requeueEnded();
     const expired = mail.expireQueued(now);
     const flagged = mail.flagUnacked(now, cfg.ackTimeoutMs);
+    const closed = mail.closeStaleDecisions(now - OPEN_DECISION_MAX_MS, now);
     const minutes = Math.round(cfg.ackTimeoutMs / 60_000);
     const notify = (m: MailRow, body: string) => {
       if (m.fromRole === HUB_ROLE) return;
@@ -356,6 +362,26 @@ export function mailUpkeep(store: Store, cfg: RolesConfig, now: number): UpkeepR
     for (const m of flagged) {
       notify(m, `${mailId(m.id)} to ${m.toRole} has no ack ${minutes} min after it was delivered.`);
     }
-    return { expired: expired.length, requeued: requeued.length, flagged: flagged.length };
+    const days = Math.round(OPEN_DECISION_MAX_MS / 86_400_000);
+    for (const d of closed) {
+      if (d.role === HUB_ROLE) continue;
+      mail.insert({
+        thread: d.id,
+        fromRole: HUB_ROLE,
+        fromSession: null,
+        toRole: d.role,
+        kind: "fyi",
+        body: `${d.id} closed: no answer within ${days} days.`,
+        evidence: null,
+        createdAt: now,
+        expiresAt: now + cfg.expiryMs,
+      });
+    }
+    return {
+      expired: expired.length,
+      requeued: requeued.length,
+      flagged: flagged.length,
+      closed: closed.length,
+    };
   });
 }

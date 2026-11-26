@@ -954,13 +954,13 @@ describe("upkeepTick", () => {
       {
         now: () => 5,
         expireSends: () => 2,
-        mailUpkeep: () => ({ expired: 1, requeued: 0, flagged: 3 }),
+        mailUpkeep: () => ({ expired: 1, requeued: 0, flagged: 3, closed: 4 }),
       },
       log,
     );
     expect(lines).toEqual([
       ["info", "sends_expired", { count: 2 }],
-      ["info", "mail_upkeep", { expired: 1, requeued: 0, flagged: 3 }],
+      ["info", "mail_upkeep", { expired: 1, requeued: 0, flagged: 3, closed: 4 }],
     ]);
   });
 
@@ -971,7 +971,7 @@ describe("upkeepTick", () => {
       {
         now: () => 5,
         expireSends: () => 0,
-        mailUpkeep: () => ({ expired: 0, requeued: 0, flagged: 0 }),
+        mailUpkeep: () => ({ expired: 0, requeued: 0, flagged: 0, closed: 0 }),
       },
       log,
     );
@@ -987,13 +987,13 @@ describe("upkeepTick", () => {
         expireSends: () => {
           throw new Error("busy");
         },
-        mailUpkeep: () => ({ expired: 0, requeued: 2, flagged: 0 }),
+        mailUpkeep: () => ({ expired: 0, requeued: 2, flagged: 0, closed: 0 }),
       },
       log,
     );
     expect(lines).toEqual([
       ["warn", "expire_failed", { err: "Error", msg: "busy" }],
-      ["info", "mail_upkeep", { expired: 0, requeued: 2, flagged: 0 }],
+      ["info", "mail_upkeep", { expired: 0, requeued: 2, flagged: 0, closed: 0 }],
     ]);
     const second = memLog();
     upkeepTick(

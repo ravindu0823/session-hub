@@ -60,8 +60,13 @@ export function upkeepTick(
   if (deps.mailUpkeep === undefined) return;
   try {
     const r = deps.mailUpkeep(store, deps.now, log);
-    if (r.expired + r.requeued + r.flagged > 0) {
-      log.info("mail_upkeep", { expired: r.expired, requeued: r.requeued, flagged: r.flagged });
+    if (r.expired + r.requeued + r.flagged + r.closed > 0) {
+      log.info("mail_upkeep", {
+        expired: r.expired,
+        requeued: r.requeued,
+        flagged: r.flagged,
+        closed: r.closed,
+      });
     }
   } catch (e) {
     log.warn("mail_upkeep_failed", errFields(e));

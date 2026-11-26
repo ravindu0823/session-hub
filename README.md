@@ -339,7 +339,7 @@ Everything lives in `%LOCALAPPDATA%\SessionHub\`:
 | Item | What it holds | How long |
 | --- | --- | --- |
 | `hub.db` | Session list, parsed status sections and the masked message text of each session, with a full-text index | Messages older than 7 days are deleted from every session, live ones included; a session's row goes 7 days after it ends. The daemon purges hourly and compacts the file daily |
-| `hub.db` (mail) | Mail between sessions and the decision list, as sent (not masked: text that looks secret is refused) | Mail older than 7 days is deleted (queued mail expires first, so its sender is told); a decision goes 7 days after it was answered or closed, an open one stays |
+| `hub.db` (mail) | Mail between sessions and the decision list, as sent (not masked: text that looks secret is refused) | Mail older than 7 days is deleted (queued mail expires first, so its sender is told); a decision goes 7 days after it was answered or closed; an open one is closed after 30 days without an answer |
 | `roles.json` | Your roles, if you made the file | Yours to keep or delete |
 | `gui.json` | Tray settings and unsent drafts | A draft is dropped when its session has not been seen for 7 days |
 | `run\` | Daemon and tray logs, `relay.log`, lock and pid files | Logs never contain message text |

@@ -426,8 +426,26 @@ export class MailStore {
   }
 
   /**
+   * Retention (PII-03): open decisions created before the cutoff are closed now, so the purge removes
+   * them a retention window later. Returns the rows closed by this call.
+   */
+  closeStaleDecisions(cutoff: number, now: number): DecisionRow[] {
+    const rows = this.db
+      .query(
+        `UPDATE decisions SET state = 'closed', closed_at = ?
+         WHERE state = 'open' AND created_at < ? RETURNING id`,
+      )
+      .all(now, cutoff) as { id: string }[];
+    return rows
+      .map((r) => this.getDecision(r.id))
+      .filter((d): d is DecisionRow => d !== null)
+      .sort((a, b) => a.seq - b.seq);
+  }
+
+  /**
    * Retention: mail older than the cutoff, except queued mail (the upkeep expires it first, so its
-   * sender is told), and settled decisions closed or answered before the cutoff.
+   * sender is told), and settled decisions closed or answered before the cutoff. Open decisions stay;
+   * the upkeep closes them after OPEN_DECISION_MAX_MS (closeStaleDecisions).
    */
   purge(cutoff: number): void {
     this.db.query("DELETE FROM mail WHERE created_at < ? AND state <> 'queued'").run(cutoff);

@@ -9,6 +9,7 @@ import {
   MAX_MAIL_PER_MINUTE,
   MailRefused,
   mailUpkeep,
+  OPEN_DECISION_MAX_MS,
   resolveCaller,
   sendMail,
 } from "../../src/mail/service";
@@ -280,7 +281,7 @@ describe("mailUpkeep", () => {
     });
     const now = 20 + cfg.ackTimeoutMs;
     const r = mailUpkeep(store, cfg, now);
-    expect(r).toEqual({ expired: 1, requeued: 0, flagged: 2 });
+    expect(r).toEqual({ expired: 1, requeued: 0, flagged: 2, closed: 0 });
     const notes = ms.inbox("alpha");
     expect(notes.map((m) => [m.fromRole, m.kind, m.thread])).toEqual([
       ["hub", "fyi", "T-9"],
@@ -292,7 +293,12 @@ describe("mailUpkeep", () => {
       "M-000001 to beta has no ack 30 min after it was delivered.",
       "M-000002 to beta has no ack 30 min after it was delivered.",
     ]);
-    expect(mailUpkeep(store, cfg, now + 1)).toEqual({ expired: 0, requeued: 0, flagged: 0 });
+    expect(mailUpkeep(store, cfg, now + 1)).toEqual({
+      expired: 0,
+      requeued: 0,
+      flagged: 0,
+      closed: 0,
+    });
   });
 
   test("mail of an ended session goes back to the queue", () => {
@@ -328,7 +334,33 @@ describe("mailUpkeep", () => {
       createdAt: 0,
       expiresAt: 5,
     });
-    expect(mailUpkeep(store, cfg, 10)).toEqual({ expired: 1, requeued: 0, flagged: 0 });
+    expect(mailUpkeep(store, cfg, 10)).toEqual({ expired: 1, requeued: 0, flagged: 0, closed: 0 });
     expect(ms.inbox("hub", { all: true })).toEqual([]);
+  });
+
+  test("an open decision older than the limit is closed and its role told once (PII-03)", () => {
+    const ms = store.mail();
+    const base = {
+      role: "alpha",
+      question: "q",
+      options: [],
+      recommendation: null,
+      fromSession: null,
+    };
+    ms.createDecision({ ...base, createdAt: 0 });
+    ms.createDecision({ ...base, createdAt: 0 });
+    ms.createDecision({ ...base, createdAt: 1 });
+    ms.answerDecision("D-0002", "yes", "cli", 5);
+    const now = OPEN_DECISION_MAX_MS + 1;
+    expect(mailUpkeep(store, cfg, now)).toEqual({ expired: 0, requeued: 0, flagged: 0, closed: 1 });
+    expect(ms.getDecision("D-0001")?.state).toBe("closed");
+    expect(ms.getDecision("D-0001")?.closedAt).toBe(now);
+    expect(ms.getDecision("D-0002")?.state).toBe("answered");
+    expect(ms.getDecision("D-0003")?.state).toBe("open");
+    const notes = ms.inbox("alpha");
+    expect(notes.map((m) => [m.fromRole, m.kind, m.thread, m.body])).toEqual([
+      ["hub", "fyi", "D-0001", "D-0001 closed: no answer within 30 days."],
+    ]);
+    expect(mailUpkeep(store, cfg, now).closed).toBe(0);
   });
 });

@@ -16,7 +16,8 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
   optional local `roles.json` or the session's name, and `hub roles`. Mail for a role with no live session waits
   for the next one; the daemon requeues mail of ended sessions, expires old mail and tells the sender about unacked
   or expired mail. The owner's decision list: `hub ask`, `hub answer` (stored once, mailed to the role, a second
-  different answer is a conflict) and `hub decisions`. Index schema v6. (#28)
+  different answer is a conflict) and `hub decisions`. An open decision unanswered for 30 days is closed and its
+  role told, so retention removes it 7 days later. Index schema v6. (#28)
 - Waiting items the owner already answered in the session's own terminal are marked answered and left
   out of the counts; owner messages typed while a session is busy are indexed; the tray has a Send button
   and Dismiss/Undo per item. (#14)

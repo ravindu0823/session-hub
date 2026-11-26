@@ -332,6 +332,22 @@ describe("retention", () => {
     expect(ms.getDecision("D-0001")?.state).toBe("open");
     expect(ms.getDecision("D-0002")).toBeNull();
   });
+
+  test("a stale open decision is closed, then purged with the settled ones", () => {
+    const ms = store.mail();
+    const day = 86_400_000;
+    const base = { role: "alpha", question: "q", options: [], recommendation: null };
+    ms.createDecision({ ...base, fromSession: null, createdAt: 0 });
+    ms.createDecision({ ...base, fromSession: null, createdAt: 2 * day });
+    const closed = ms.closeStaleDecisions(day, 40 * day);
+    expect(closed.map((d) => d.id)).toEqual(["D-0001"]);
+    expect(ms.closeStaleDecisions(day, 41 * day)).toEqual([]);
+    store.purge(46 * day);
+    expect(ms.getDecision("D-0001")).not.toBeNull();
+    store.purge(48 * day);
+    expect(ms.getDecision("D-0001")).toBeNull();
+    expect(ms.getDecision("D-0002")?.state).toBe("open");
+  });
 });
 
 describe("ids and retention (review)", () => {
