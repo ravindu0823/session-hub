@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { DELIVERY_WINDOW_MS, EXPIRE_EVERY_MS, PROFILES } from "../config.ts";
+import { parseRolesConfig, type RolesConfig } from "../mail/roles.ts";
+import { answerAndNotify, MailRefused } from "../mail/service.ts";
 import { maskSecrets } from "../security/mask.ts";
 import { refusalText } from "../send/refusals.ts";
 import { SendRefused, type SendRequest } from "../send/relay.ts";
@@ -58,6 +60,13 @@ export interface BridgeDeps {
   now(): number;
   sleep(ms: number): Promise<void>;
   version: string;
+  /** The local roles file, parsed (src/mail/roles.ts); without it a session's role is its name. */
+  roles?(): RolesConfig;
+  /**
+   * True when this bridge runs inside a Claude Code session (its environment says so). Answers are
+   * then refused, as `hub answer` refuses: it prevents mistakes, it is not proof of who answers.
+   */
+  insideSession?(): boolean;
 }
 
 const KNOWN_PROFILES: readonly string[] = PROFILES.map((p) => p.id);
@@ -86,6 +95,7 @@ function emptySnapshot(daemonRunning: boolean): HubSnapshot {
       relayStrayCount: 0,
     },
     totals: { waitingItems: 0, needsApproval: 0, live: 0 },
+    mail: { decisions: [], waitingRoles: [], flagged: 0, ownerOpen: 0 },
   };
 }
 
@@ -365,6 +375,7 @@ class Bridge {
           daemonRunning: daemon,
           knownProfiles: KNOWN_PROFILES,
           now,
+          roles: this.roles(),
         });
         this.lastStoreError = null;
       } catch (e) {
@@ -456,6 +467,9 @@ class Bridge {
       case "startDaemon":
         this.launch(req.id, this.handleStartDaemon(req.id));
         return;
+      case "answer":
+        this.answer(req);
+        return;
       case "send":
         this.launch(req.id, this.handleSend(req));
         return;
@@ -499,6 +513,55 @@ class Bridge {
       more = true;
     }
     this.reply(req.id, { messages, truncated, more });
+  }
+
+  /** The roles file as the deps read it; an unreadable or invalid file leaves only session names. */
+  private roles(): RolesConfig {
+    try {
+      return this.deps.roles?.() ?? parseRolesConfig(null);
+    } catch {
+      return parseRolesConfig(null);
+    }
+  }
+
+  /**
+   * The owner's answer from the tray: stored once and mailed to the decision's role. "same",
+   * "conflict" (a different answer is never applied without `replace`), "closed" and "not-found"
+   * come back as the result for the tray to show; a refused text is an error with its reason.
+   */
+  private answer(req: Extract<Request, { type: "answer" }>): void {
+    if (this.deps.insideSession?.() === true) {
+      this.replyError(req.id, {
+        code: "not-owner",
+        message: "answers are for the owner, from a tray started outside Claude Code sessions",
+      });
+      return;
+    }
+    const store = this.openStore();
+    if (store === null) {
+      this.replyError(req.id, { code: "no-store", message: NO_STORE });
+      return;
+    }
+    try {
+      const r = answerAndNotify(
+        store,
+        this.roles(),
+        req.decisionId,
+        req.text,
+        "tray",
+        this.deps.now(),
+        { replace: req.replace === true },
+      );
+      // Our own write does not move data_version: emit a fresh snapshot on the next tick.
+      if (r.result === "answered" || r.result === "replaced") this.dirty = true;
+      this.reply(req.id, { result: r.result, role: r.row === null ? null : cleanText(r.row.role) });
+    } catch (e) {
+      if (e instanceof MailRefused) {
+        this.replyError(req.id, { code: e.reason, message: errText(e) });
+        return;
+      }
+      throw e;
+    }
   }
 
   private async handleStartDaemon(id: number): Promise<void> {

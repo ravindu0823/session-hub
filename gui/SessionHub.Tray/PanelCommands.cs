@@ -20,6 +20,12 @@ public static class PanelCommands
     public static readonly RoutedUICommand SendSecretAnyway = new("Send anyway", nameof(SendSecretAnyway), typeof(PanelCommands));
     public static readonly RoutedUICommand Jump = new("Jump to terminal", nameof(Jump), typeof(PanelCommands));
     public static readonly RoutedUICommand OpenInWindow = new("Open in window", nameof(OpenInWindow), typeof(PanelCommands));
+
+    /// <summary>A decision card's Answer button. The parameter is the card (a DecisionCardViewModel). A button click only.</summary>
+    public static readonly RoutedUICommand AnswerDecision = new("Answer", nameof(AnswerDecision), typeof(PanelCommands));
+
+    /// <summary>Replace after a conflict: stores the draft in place of the answer already there. A button click only.</summary>
+    public static readonly RoutedUICommand ReplaceDecision = new("Replace", nameof(ReplaceDecision), typeof(PanelCommands));
 }
 
 /// <summary>What the panel needs from the app. <see cref="TrayController"/> is the real one; the render check has its own.</summary>

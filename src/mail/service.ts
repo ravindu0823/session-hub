@@ -93,6 +93,21 @@ export function insideClaudeCode(env: Record<string, string | undefined>): boole
 }
 
 /**
+ * The environment without CLAUDECODE and CLAUDE_CODE_* (Windows names match in any case): for the
+ * tray, which `hub install` may start from a session's shell but which is never that session.
+ */
+export function withoutSessionEnv(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(env).filter(([k]) => {
+      const u = k.toUpperCase();
+      return u !== "CLAUDECODE" && !u.startsWith("CLAUDE_CODE_");
+    }),
+  );
+}
+
+/**
  * The caller: outside Claude Code it is the owner; inside, the session named by
  * CLAUDE_CODE_SESSION_ID, which the daemon must have indexed (waited for up to `waitMs`) and which
  * must be live and have a role.

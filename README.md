@@ -136,7 +136,7 @@ Run `hub`. It starts the daemon if it is not running.
 | Key | Action |
 | --- | --- |
 | `↑` / `↓` | Select a session |
-| `1` / `2` / `3` | Status / History / Send pane |
+| `1` / `2` / `3` / `4` | Status / History / Send pane / Decisions (read-only) |
 | `/` | Search |
 | `j` | Jump to the session's terminal window |
 | `r` | Refresh |
@@ -261,7 +261,10 @@ twice (marked `"redelivered": true`), so handle each id once.
 session's role. You answer it from a terminal outside Claude Code with `hub answer D-0001 --text yes`: the answer is
 stored once and mailed to that role. A second, different answer is recorded as a conflict and not applied;
 `--replace` changes it on purpose. `hub decisions` lists them, and the role closes its own with
-`hub decisions close D-0001`.
+`hub decisions close D-0001`. The tray shows open decisions at the top of its Home and Waiting tabs, each with an
+answer box; after a conflict a Replace button appears. A tray answer is sent once and never retried; if no reply
+comes, the card says the answer may have been stored. The tray refuses answers when it was started from inside a
+Claude Code session. The terminal app lists decisions on its Decisions tab (key `4`).
 
 In Git Bash (Claude Code's Bash tool on Windows) `hub` is a `.cmd` shim: call `hub.cmd`, or the program itself at
 `"$LOCALAPPDATA/SessionHub/bin/hub.exe"`. `hub mail --help` lists every option.

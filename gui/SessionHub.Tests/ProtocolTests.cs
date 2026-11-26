@@ -260,6 +260,8 @@ public class ProtocolTests
             new HistoryRequest(11, "s-alpha", 1),
             new HistoryRequest(12, "s-big", 10),
             new HistoryRequest(13, "s-alpha", 50, "2025-11-13T02:10:00.000Z", "m3"),
+            new AnswerRequest(14, "D-0001", "yes"),
+            new AnswerRequest(15, "D-0002", "maybe"),
             new ShutdownRequest(),
         ];
         Assert.Equal(expected.Length, reqs.Length);

@@ -1,7 +1,7 @@
 import { Box, render, Text } from "ink";
 import { createElement } from "react";
 import { runCli } from "./cli/commands.ts";
-import { realCliDeps, runRealBridge } from "./cli/real-deps.ts";
+import { realCliDeps, rolesForView, runRealBridge } from "./cli/real-deps.ts";
 import { PROFILES, RELAY_LOG } from "./config.ts";
 import { createLogger } from "./daemon/log.ts";
 import { realClaudeCli } from "./discovery/agents.ts";
@@ -40,6 +40,7 @@ const deps = realCliDeps({
         focus: (pid: number) => platform.focusSessionWindow(pid),
         buildMessage,
         now,
+        roles: () => rolesForView(paths.dataDir),
       });
       const root = warning
         ? createElement(

@@ -26,7 +26,7 @@ let alive: Set<number>;
 let images: Map<number, string>;
 let spawned: string[][];
 /** Options of each spawnDetached call, in order. */
-let spawnOpts: ({ gui?: boolean; cwd?: string } | undefined)[];
+let spawnOpts: ({ gui?: boolean; cwd?: string; outsideSession?: boolean } | undefined)[];
 let killed: number[];
 /** signal, kill:<pid>, copy:<file>, spawn:<file>, set:<name>, clear:<name>, in call order. */
 let events: string[];
@@ -194,7 +194,11 @@ describe("install with the tray app", () => {
     });
     expect(spawned).toEqual([[p.installedDaemonExe], [p.installedTrayExe]]);
     // both run in bin (never pinning the installer's folder); only the daemon starts hidden
-    expect(spawnOpts).toEqual([{ cwd: p.binDir }, { gui: true, cwd: p.binDir }]);
+    // The tray starts outside any session's environment; the daemon keeps it.
+    expect(spawnOpts).toEqual([
+      { cwd: p.binDir },
+      { gui: true, cwd: p.binDir, outsideSession: true },
+    ]);
     // the quit event is always set first; with no tray running it is a no-op
     expect(events).toEqual([
       "signal",
