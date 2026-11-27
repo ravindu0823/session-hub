@@ -327,6 +327,8 @@ export function realCliDeps(opts: {
         readInput: async (p) => (p === "-" ? await Bun.stdin.text() : readFileSync(p, "utf8")),
         sleep: (ms) => Bun.sleep(ms),
         exists: (p) => existsSync(p),
+        // `hub` is not on PATH in every shell a session uses: the hook text names this exe.
+        ...(compiled ? { selfCommand: process.execPath } : {}),
       }),
     sleep: (ms) => Bun.sleep(ms),
   };

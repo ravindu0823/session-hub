@@ -107,7 +107,8 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
 - Third-party callers: none. The app has no inbound endpoint, webhook or deploy hook, so SEC-06 has nothing to cover.
   Its only inputs are local files written by Claude Code, the tray's stdin/stdout bridge child (which also takes
   the owner's decision answers), and the `hub mail`, `hub ask` and `hub answer` commands that local sessions and
-  the owner run.
+  the owner run. `hub mail hook` also reads Claude Code's hook input on stdin: only `hook_event_name` and
+  `session_id` are used; the rest (a UserPromptSubmit prompt included) is parsed and dropped, never stored or logged.
 
 ## Target architecture
 - Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index and owns its schema; the TUI and the

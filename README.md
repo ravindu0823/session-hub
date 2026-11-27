@@ -270,6 +270,29 @@ chat that two roles list) under `problems`.
 | done | The step is finished |
 | expired | No session of the role took it in time (72 hours unless set otherwise); the sender gets a notice |
 
+**See mail without polling.** `hub mail hook` is a Claude Code hook command for `SessionStart` and
+`UserPromptSubmit`. It reads the hook input, finds the session's role and, when that role has open mail, adds one
+line of context naming the ids, kinds and sender roles (never the text; a sender that is not a valid role name shows
+as unknown, owner and hub mail as unverified) and the command that reads them. With no mail it prints nothing. A
+SessionStart call waits up to 5 s for the daemon to index the new session; UserPromptSubmit never waits. It changes
+nothing and always exits 0, so it never blocks a prompt; an unexpected failure (an older index, a bad `roles.json`)
+writes one stderr line with the error class only. It does not wake an idle session: for that, run `hub mail follow`
+under a monitor. Install a build that has `hub mail hook` before you add it, then add it to each profile's
+`settings.json` (use the installed path of `hub.exe`):
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail hook", "timeout": 10 }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail hook", "timeout": 5 }] }
+    ]
+  }
+}
+```
+
 Delivery is at least once: after `follow` starts again, or after mail went back to the queue, a message can arrive
 twice (marked `"redelivered": true`), so handle each id once.
 
