@@ -755,20 +755,25 @@ describe("hub mail hook: review fixes", () => {
     files.set("-", JSON.stringify({ hook_event_name: event, session_id: sessionId }));
   }
 
+  /** One store per test: opening a Store per insert made a 13-insert test time out under load. */
+  let shared: Store | null = null;
+  afterEach(() => {
+    shared = null;
+  });
+
   function rawMail(fromRole: string, kind = "task"): void {
-    open()
-      .mail()
-      .insert({
-        thread: "T",
-        fromRole,
-        fromSession: null,
-        toRole: "beta",
-        kind: kind as "task",
-        body: "b",
-        evidence: null,
-        createdAt: clock,
-        expiresAt: clock + 1e9,
-      });
+    shared ??= open();
+    shared.mail().insert({
+      thread: "T",
+      fromRole,
+      fromSession: null,
+      toRole: "beta",
+      kind: kind as "task",
+      body: "b",
+      evidence: null,
+      createdAt: clock,
+      expiresAt: clock + 1e9,
+    });
   }
 
   function text(r: Run): string {
@@ -861,7 +866,7 @@ describe("hub mail hook: review fixes", () => {
 
   test("exactly 10 open shows no 'more'; acked, done and expired mail is not counted", async () => {
     for (let i = 0; i < 13; i++) rawMail("alpha");
-    const m = open().mail();
+    const m = (shared ?? open()).mail();
     m.claim("beta", "s-beta", clock);
     m.ack(1, "beta", "s-beta", clock);
     m.done(2, "beta", clock);
