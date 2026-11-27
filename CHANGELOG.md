@@ -14,6 +14,8 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
 - `hub mail hook`: a `SessionStart` / `UserPromptSubmit` hook command that names a live session's open mail (ids,
   kinds and sender roles, never the text) as one line of context, so mail no longer waits until the session polls.
   Silent with no mail and on every problem; changes nothing. (#38)
+- `hub mail statusline`: a status line command that prints `✉ N` for the session's open mail (read-only, never
+  waits, silent with no mail and on every problem). (#43)
 
 - Role catalogue in `roles.json`: optional `folder`, `brief`, `model`, `effort`, `gateway`, `mcpServers`, `plugins`,
   `telegramChats` and a unique `questionPrefix` per role, plus `reservedPrefixes`, checked by the parser and returned
