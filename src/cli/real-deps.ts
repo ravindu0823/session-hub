@@ -12,7 +12,7 @@ import { realClaudeCli } from "../discovery/agents.ts";
 import { runMailCli } from "../mail/cli.ts";
 import { parseRolesConfig, type RolesConfig, rolesLoader } from "../mail/roles.ts";
 import { insideClaudeCode, mailUpkeep, withoutSessionEnv } from "../mail/service.ts";
-import { sqliteWaiterState } from "../mail/waiter.ts";
+import { recentFile, sqliteWaiterState } from "../mail/waiter.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
 import { claimMarkerFile, runGuard } from "../send/guard.ts";
@@ -330,12 +330,13 @@ export function realCliDeps(opts: {
         exists: (p) => existsSync(p),
         openWaiter: () =>
           sqliteWaiterState(join(paths.runDir, "waiters", "waiters.db"), process.pid),
-        // An install stages hub.exe.new before its swap, a deliberate daemon stop (install,
+        // An install stages hub.exe.new before its swap (a recent one: a copy left by a killed
+        // install must not keep every waiter off), a deliberate daemon stop (install,
         // uninstall) writes daemon.stopped first, and a purge deletes hub.db: a waiter then exits
         // and lets go of hub.exe.
         shouldStop: () =>
           existsSync(join(paths.runDir, DAEMON_STOPPED_FILE)) ||
-          existsSync(`${paths.installedExe}.new`) ||
+          recentFile(`${paths.installedExe}.new`, 120_000) ||
           !existsSync(paths.dbPath),
         // `hub` is not on PATH in every shell a session uses: the hook text names this exe.
         ...(compiled ? { selfCommand: process.execPath } : {}),

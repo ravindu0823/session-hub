@@ -1,8 +1,9 @@
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { LEASE_MS, sqliteWaiterState, type WaiterState } from "../../src/mail/waiter";
+import { recentFile, sqliteWaiterState, type WaiterState } from "../../src/mail/waiter";
 
 let dir: string;
 let path: string;
@@ -24,49 +25,61 @@ afterEach(() => {
 const k = (id: number, deliveries = 0) => ({ id, deliveries });
 
 describe("waiter lease", () => {
-  test("one waiter per session: a second claim, from another connection, gets none", () => {
+  test("the newest claim wins; the older holder sees its token gone at its next renew", () => {
     const a = state(10);
     const b = state(11);
-    const t = a.claim("s-1", 1_000, 0);
-    expect(t).not.toBeNull();
-    expect(b.claim("s-1", 1_000, 1)).toBeNull();
-    expect(b.claim("s-2", 1_000, 1)).not.toBeNull();
-    a.release("s-1", t ?? "");
-    expect(b.claim("s-1", 1_000, 2)).not.toBeNull();
+    const t1 = a.claim("s-1", 1_000, 0);
+    expect(a.renew("s-1", t1, 1)).toBe(1_000);
+    const t2 = b.claim("s-1", 5_000, 2);
+    expect(t2).not.toBe(t1);
+    expect(a.renew("s-1", t1, 3)).toBeNull();
+    expect(b.renew("s-1", t2, 4)).toBe(5_000);
+    a.release("s-1", t1); // not its lease any more: no effect
+    expect(b.renew("s-1", t2, 5)).toBe(5_000);
+    b.release("s-1", t2);
+    expect(b.renew("s-1", t2, 6)).toBeNull();
   });
 
-  test("a losing claim extends the holder's deadline, never shortens it", () => {
-    const a = state();
-    const t = a.claim("s-1", 1_000, 0) ?? "";
-    expect(state(11).claim("s-1", 5_000, 10)).toBeNull();
-    expect(a.renew("s-1", t, 20)).toBe(5_000);
-    expect(state(12).claim("s-1", 3_000, 30)).toBeNull();
-    expect(a.renew("s-1", t, 40)).toBe(5_000);
-  });
-
-  test("a lease with no heartbeat for the lease time is taken over; the old holder then stops", () => {
-    const a = state(10);
-    const b = state(11);
-    const t = a.claim("s-1", 999_999, 0) ?? "";
-    expect(a.renew("s-1", t, LEASE_MS - 1)).toBe(999_999);
-    expect(b.claim("s-1", 999_999, 2 * LEASE_MS - 1)).toBeNull(); // heartbeat kept it alive
-    const t2 = b.claim("s-1", 999_999, 3 * LEASE_MS);
-    expect(t2).not.toBeNull();
-    expect(a.renew("s-1", t, 3 * LEASE_MS + 1)).toBeNull();
-    a.release("s-1", t); // not its lease any more: no effect
-    expect(b.renew("s-1", t2 ?? "", 3 * LEASE_MS + 2)).toBe(999_999);
-  });
-
-  test("two takeovers of the same stale lease leave exactly one holder", () => {
+  test("a holder that was killed (never released) does not block the next claim", () => {
     state(9).claim("s-1", 1, 0);
-    const now = 10 * LEASE_MS;
-    const tokens = [state(10).claim("s-1", 2, now), state(11).claim("s-1", 2, now)];
-    expect(tokens.filter((t) => t !== null)).toHaveLength(1);
+    const t = state(10).claim("s-1", 99, 1);
+    expect(state(11).renew("s-1", t, 2)).toBe(99);
+  });
+
+  test("sessions are leased apart", () => {
+    const a = state();
+    const t1 = a.claim("s-1", 10, 0);
+    a.claim("s-2", 20, 0);
+    expect(a.renew("s-1", t1, 1)).toBe(10);
   });
 
   test("a session id that is not a plain name is refused", () => {
     expect(() => state().claim("../x", 1, 0)).toThrow();
     expect(existsSync(join(dir, "x"))).toBe(false);
+  });
+
+  test("the file carries a schema version; a newer file is refused", () => {
+    state().close();
+    const raw = new Database(path);
+    expect((raw.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
+      1,
+    );
+    raw.run("PRAGMA user_version = 2");
+    raw.close();
+    expect(() => sqliteWaiterState(path, 1)).toThrow("newer");
+  });
+});
+
+describe("recentFile", () => {
+  test("a fresh copy of an old file is recent; a missing file is not", () => {
+    const old = join(dir, "old.txt");
+    writeFileSync(old, "x");
+    utimesSync(old, new Date(2020, 0, 1), new Date(2020, 0, 1));
+    const copy = join(dir, "old.txt.new");
+    copyFileSync(old, copy);
+    expect(recentFile(copy, 120_000)).toBe(true);
+    expect(recentFile(copy, 120_000, Date.now() + 200_000)).toBe(false);
+    expect(recentFile(join(dir, "none"), 120_000)).toBe(false);
   });
 });
 

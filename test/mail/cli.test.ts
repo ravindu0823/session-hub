@@ -1197,21 +1197,31 @@ describe("hub mail wait (asyncRewake doorbell)", () => {
     expect(again.err[0]).toContain("M-000001");
   });
 
-  test("a second waiter exits at once and extends the running waiter's time limit", async () => {
+  test("a newer waiter (the next Stop) takes over; the older one exits at its next poll", async () => {
     hookInput("Stop", "s-beta");
-    const t0 = clock;
     let second = null as Run | null;
-    const r = await wait(
-      async (n) => {
-        // A Stop while the first waiter runs: it must not start, and must keep the session covered.
-        if (n === 5) second = await run("mail", ["wait", "--max-minutes", "3"], {}, { openWaiter });
-      },
-      ["wait", "--max-minutes", "1"],
-    );
-    expect(second).toEqual({ code: 0, out: [], err: [] });
-    expect(r).toMatchObject({ code: 0, err: [] });
-    expect(clock - t0).toBeGreaterThanOrEqual(3 * 60_000);
-    expect(clock - t0).toBeLessThan(3 * 60_000 + 10_000);
+    let secondSleeps = 0;
+    const r = await wait(async (n) => {
+      if (n === 5) {
+        second = await run(
+          "mail",
+          ["wait", "--max-minutes", "1"],
+          {},
+          {
+            openWaiter,
+            waitPollMs: 1_000,
+            sleep: async (ms) => {
+              clock += ms;
+              secondSleeps++;
+              if (secondSleeps === 3) rawMail();
+            },
+          },
+        );
+      }
+    });
+    expect(second?.code).toBe(2); // the newer waiter rang
+    expect(second?.err[0]).toContain("M-000001");
+    expect(r).toMatchObject({ code: 0, err: [], sleeps: 5 }); // the older one let go
   });
 
   test("gives up silently at the time limit and ends its lease", async () => {

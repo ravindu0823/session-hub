@@ -838,8 +838,8 @@ function waitMinutes(args: readonly string[]): number | null {
  * not rung for, then writes one doorbell line to stderr and exits 2, which starts a turn in the
  * session. The line names only ids, kinds and sender roles, never a body: bodies reach the session
  * through `hub mail inbox` with the peer notice. Mail queued before the session's first waiter, or
- * already named by `hub mail hook`, does not ring; requeued mail rings again. A newer claim while a
- * waiter runs extends that waiter's time limit. Changes no mail. Every other end (time limit,
+ * already named by `hub mail hook`, does not ring; requeued mail rings again. A newer waiter for the
+ * session (the next Stop) replaces the running one, which exits at its next poll. Changes no mail. Every other end (time limit,
  * session ended, an install or a daemon stop under way, bad input or a bad flag, any failure) exits
  * 0, so nothing is shown to the model (exit 2 would start a turn, and a bad flag in a Stop hook
  * would then loop); a failure writes one stderr line with the error class only.
@@ -866,7 +866,6 @@ async function runMailWait(d: MailCliDeps, args: readonly string[]): Promise<num
   try {
     const start = d.now();
     token = withWaiter((w) => w.claim(call.sid, start + minutes * 60_000, start));
-    if (token === null) return 0;
     const mine = token;
     let errors = 0;
     for (;;) {
@@ -885,7 +884,7 @@ async function runMailWait(d: MailCliDeps, args: readonly string[]): Promise<num
         }
         [until, r] = [Number.POSITIVE_INFINITY, null];
       }
-      if (until === null || r === STOP) return 0; // another waiter took over, or stop
+      if (until === null || r === STOP) return 0; // a newer waiter took over, or stop
       if (r !== null) {
         d.err(r);
         return 2;

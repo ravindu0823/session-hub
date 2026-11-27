@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 
 /** A mail as the doorbell keys it: requeued mail (one more delivery) counts as new. */
@@ -15,11 +15,11 @@ export interface MailKey {
  */
 export interface WaiterState {
   /**
-   * Takes the session's waiter lease until `until`, returning its token. When a live waiter
-   * already holds it (heartbeat within the lease time), extends that waiter's `until` and returns
-   * null.
+   * Takes the session's waiter lease until `until`, returning its token. The newest claim always
+   * wins: an older waiter (alive, or killed at its hook timeout before it could let go) sees its
+   * token gone at its next renew and exits, so the session is always covered by the newest hook.
    */
-  claim(sessionId: string, until: number, now: number): string | null;
+  claim(sessionId: string, until: number, now: number): string;
   /** Heartbeat: the time to wait until while `token` still holds the lease, else null. */
   renew(sessionId: string, token: string, now: number): number | null;
   release(sessionId: string, token: string): void;
@@ -33,11 +33,11 @@ export interface WaiterState {
   close(): void;
 }
 
-/** A waiter that missed heartbeats this long is gone (crashed, killed or asleep): its lease ends. */
-export const LEASE_MS = 30_000;
 /** Sessions not seen for this long are forgotten. */
 const KEEP_MS = 14 * 24 * 3600_000;
 
+/** `PRAGMA user_version` of waiters.db; raise it with any change to the tables below. */
+const SCHEMA_VERSION = 1;
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS waiter (
   session_id TEXT PRIMARY KEY,
@@ -64,9 +64,17 @@ const SESSION_RE = /^[A-Za-z0-9-]{1,100}$/;
 export function sqliteWaiterState(path: string, pid: number): WaiterState {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true, readwrite: true, strict: true });
-  db.run("PRAGMA busy_timeout = 5000");
-  db.run("PRAGMA journal_mode = WAL");
-  db.run(SCHEMA);
+  try {
+    db.run("PRAGMA busy_timeout = 2000");
+    db.run("PRAGMA journal_mode = WAL");
+    const v = (db.query("PRAGMA user_version").get() as { user_version: number }).user_version;
+    if (v > SCHEMA_VERSION) throw new Error(`waiters.db version ${v} is newer than this build`);
+    db.run(SCHEMA);
+    if (v < SCHEMA_VERSION) db.run(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  } catch (e) {
+    db.close();
+    throw e;
+  }
   const check = (s: string) => {
     if (!SESSION_RE.test(s)) throw new Error("bad session id");
   };
@@ -84,7 +92,7 @@ export function sqliteWaiterState(path: string, pid: number): WaiterState {
     for (const k of keys) ins.run(s, k.id, k.deliveries);
   };
   return {
-    claim: db.transaction((s: string, until: number, now: number): string | null => {
+    claim: db.transaction((s: string, until: number, now: number): string => {
       check(s);
       // Forget old sessions here, the one place every waiter passes.
       const old = now - KEEP_MS;
@@ -93,15 +101,6 @@ export function sqliteWaiterState(path: string, pid: number): WaiterState {
       ).run(old);
       db.query("DELETE FROM session WHERE seen_at < ?").run(old);
       db.query("DELETE FROM waiter WHERE seen_at < ?").run(old);
-      const row = db
-        .query("SELECT seen_at AS seen, until_at AS until FROM waiter WHERE session_id = ?")
-        .get(s) as { seen: number; until: number } | null;
-      if (row !== null && row.seen >= now - LEASE_MS) {
-        if (until > row.until) {
-          db.query("UPDATE waiter SET until_at = ? WHERE session_id = ?").run(until, s);
-        }
-        return null;
-      }
       const token = crypto.randomUUID();
       db.query(
         `INSERT INTO waiter (session_id, token, pid, seen_at, until_at) VALUES (?, ?, ?, ?, ?)
@@ -142,4 +141,15 @@ export function sqliteWaiterState(path: string, pid: number): WaiterState {
       db.close();
     },
   };
+}
+
+/** True when the file exists and changed within the last `ms` (a waiter stop signal). */
+export function recentFile(path: string, ms: number, now = Date.now()): boolean {
+  try {
+    // A copy keeps its source's modified time on Windows; its creation time is the copy's.
+    const s = statSync(path);
+    return now - Math.max(s.birthtimeMs, s.mtimeMs) < ms;
+  } catch {
+    return false;
+  }
 }
