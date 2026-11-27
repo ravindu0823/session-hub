@@ -22,7 +22,10 @@ When you run several Claude Code sessions at once, it is easy to miss the one th
 twenty minutes. Session Hub watches the sessions on this machine and shows, in one terminal app and one tray icon:
 
 - **What needs you now.** Each session's latest *Progress*, *What's remaining* and *Waiting on you* sections, with the
-  questions listed one by one.
+  questions listed one by one. *Waiting on you* can be a plain list or grouped: a line at the left margin that starts
+  with 🔴 🟡 🟢 ⚪ and a bold title opens a group; inside a group, tables are read row by row (the cell that is an ID
+  such as `SH12` names the item), 🆕 marks a new item, and a ✅ group (settled) is not listed. Outside a group, a table
+  ends the section.
 - **Who is busy, idle or blocked.** Live state per session, including sessions stuck on a permission prompt.
 - **What was said.** The last 7 days of each session's history, searchable, with secrets masked.
 - **A way to reply.** Type answers next to each question, or a free message, and send it to that session.
