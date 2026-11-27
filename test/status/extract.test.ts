@@ -648,3 +648,72 @@ describe("the standard template: third review fixes", () => {
     expect(s?.recommendations).toEqual([]);
   });
 });
+
+describe("the standard template: final review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+
+  test("a note paragraph between groups does not end the section", () => {
+    expect(
+      ids(
+        "### Waiting on you\n🔴 **Urgent**\n- SH1 a\n\nThis blocks the release.\n\n🟡 **Later**\n- SH2 b\n",
+      ),
+    ).toEqual(["SH1", "SH2"]);
+    expect(
+      ids(
+        "### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n| SH1 | a |\n\nNote.\n\n⚪ **Can wait**\n- SH2 b\n",
+      ),
+    ).toEqual(["SH1", "SH2"]);
+  });
+
+  test("two plain ID lines in one group, split by a blank line: two items", () => {
+    expect(ids("**Waiting on you**\n🔴 **Urgent**\nSH1 approve\n\nSH2 pick\n")).toEqual([
+      "SH1",
+      "SH2",
+    ]);
+  });
+
+  test("a mark line whose bold text is an ID is an item line, as on main", () => {
+    expect(ids("### Waiting on you\n- SH1 a\n✅ **SH2** answered\n- SH3 c\n")).toEqual([
+      "SH1",
+      "SH3",
+    ]);
+    expect(ids("### Waiting on you\n🔴 **SH1** approve deploy\n🟡 **SH2** pick date\n")).toEqual([
+      null,
+    ]);
+  });
+
+  test("the settled group ends at a paragraph after a blank line", () => {
+    const s = extractStatus(
+      "### Waiting on you\n✅ **Settled**\n- SH0 yes\n\nI recommend shipping today.\n",
+    );
+    expect(s?.waiting).toEqual([]);
+    expect(s?.recommendations).toEqual(["I recommend shipping today."]);
+  });
+
+  test("a group of one plain line with no ID, after a table group, is kept", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n| SH1 | a |\n\n🟡 **Later**\nDecide the release date.\n",
+    );
+    expect(s?.waiting.map((w) => w.text)).toEqual(["a", "Decide the release date."]);
+  });
+
+  test("a second table right under the first in a group starts a new header", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n| SH1 | a |\n| ID | Reply |\n|---|---|\n| SH2 | b |\n",
+    );
+    expect(s?.waiting.map((w) => [w.id, w.text])).toEqual([
+      ["SH1", "a"],
+      ["SH2", "Reply: b"],
+    ]);
+  });
+
+  test("an open group's title is not a recommendation", () => {
+    expect(
+      extractStatus("### Waiting on you\n🟢 **Recommended next**\n- SH1 a\n")?.recommendations,
+    ).toEqual([]);
+  });
+
+  test("a whitespace-only phase still gives the progress, as on main", () => {
+    expect(extractStatus("**Progress: about 50% overall. Phase:  \n")?.progressPct).toBe(50);
+  });
+});
