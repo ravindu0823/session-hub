@@ -279,8 +279,8 @@ line of context naming the ids, kinds and sender roles (never the text; a sender
 as unknown, owner and hub mail as unverified) and the command that reads them. With no mail it prints nothing. A
 SessionStart call waits up to 5 s for the daemon to index the new session; UserPromptSubmit never waits. It changes
 nothing and always exits 0, so it never blocks a prompt; an unexpected failure (an older index, a bad `roles.json`)
-writes one stderr line with the error class only. It does not wake an idle session: for that, run `hub mail follow`
-under a monitor. Install a build that has `hub mail hook` before you add it, then add it to each profile's
+writes one stderr line with the error class only. It does not wake an idle session: for that, use `hub mail wait`
+(below) or run `hub mail follow` under a monitor. Install a build that has `hub mail hook` before you add it, then add it to each profile's
 `settings.json` (use the installed path of `hub.exe`):
 
 ```json
@@ -291,6 +291,33 @@ under a monitor. Install a build that has `hub mail hook` before you add it, the
     ],
     "UserPromptSubmit": [
       { "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail hook", "timeout": 5 }] }
+    ]
+  }
+}
+```
+
+**Wake an idle session.** `hub mail wait` is an `asyncRewake` hook command for `SessionStart` and `Stop`: Claude Code
+runs it in the background, and its exit code 2 starts a turn in the session, even an idle one, with the command's
+stderr as the text. It waits until mail is queued for the session's role that it has not rung for, then writes one
+doorbell line (it says it is a doorbell, not an error and not an approval, and names only ids, kinds and sender
+roles, never the text) and exits 2. At most one waiter runs per session (a lease in `run\waiters\waiters.db`):
+the newest one, so a `Stop` while a waiter runs replaces it and the older one exits at its next poll. The same mail never rings twice, mail that was queued before the session's first waiter or that
+`hub mail hook` already named does not ring, and mail that goes back to the queue after its session ended rings
+again. It gives up after `--max-minutes` (default 25, at most 1440), when the session ends, during an install or a
+deliberate daemon stop (it lets go of `hub.exe` within a second, so the install can replace it), on a bad flag or
+on a lasting problem, always with exit 0 and nothing shown to the session. It changes no mail. Add it next to
+`hub mail hook`, with a `timeout` (seconds) a little longer than the wait:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail wait --max-minutes 1440",
+        "asyncRewake": true, "timeout": 86460 }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail wait --max-minutes 1440",
+        "asyncRewake": true, "timeout": 86460 }] }
     ]
   }
 }

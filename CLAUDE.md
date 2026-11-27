@@ -111,6 +111,12 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   `session_id` are used; the rest (a UserPromptSubmit prompt included) is parsed and dropped, never stored or logged.
   `hub mail statusline` reads Claude Code's status-line input on stdin: only `session_id` is used; the rest is parsed
   and dropped, never stored or logged.
+  `hub mail wait` reads the same hook input as `hub mail hook` (only `hook_event_name` and `session_id`) and keeps
+  `run\waiters\waiters.db` (its own SQLite file, never hub.db: per session a waiter lease, the rung mail ids and
+  delivery counts; sessions unseen for 14 days are dropped); its stderr doorbell names only mail ids, kinds and
+  sender roles. A waiter is a `bin\hub.exe` process that can live up to 24 h per session; it exits within a second
+  when `run\daemon.stopped` or `bin\hub.exe.new` exists or hub.db is gone, so install and uninstall can replace or
+  remove the exe.
 
 ## Target architecture
 - Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index and owns its schema; the TUI and the
