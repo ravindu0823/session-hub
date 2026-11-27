@@ -363,9 +363,9 @@ describe("the standard Waiting on you template (grouped, with tables)", () => {
     expect(s?.waiting.map((w) => w.id)).toEqual(["SH1"]);
   });
 
-  test("a table without a header row; a row with no ID ends the section outside a group", () => {
+  test("outside a group any table ends the section, as before; in a group rows are items", () => {
     const s = extractStatus("### Waiting on you\n| SH1 | approve x |\n| nothing to do | here |\n");
-    expect(s?.waiting).toEqual([{ id: "SH1", text: "approve x", isNew: false, children: [] }]);
+    expect(s?.waiting).toEqual([]);
     const g = extractStatus(
       "### Waiting on you\n🟢 **Here**\n| SH1 | approve x |\n| nothing to do | here |\n",
     );
@@ -377,14 +377,16 @@ describe("the standard Waiting on you template (grouped, with tables)", () => {
 
   test("tables still end the What's remaining section, and table rows are not recommendations", () => {
     const s = extractStatus(
-      "### What's remaining\n- a\n| x | y |\n- b\n\n### Waiting on you\n| ID | I recommend |\n|---|---|\n| SH1 | yes |\n",
+      "### What's remaining\n- a\n| x | y |\n- b\n\n### Waiting on you\n🟢 **Here**\n| ID | I recommend |\n|---|---|\n| SH1 | yes |\n",
     );
     expect(s?.remaining).toEqual(["a"]);
     expect(s?.recommendations).toEqual([]);
   });
 
   test("a pipe inside a code span does not split a cell", () => {
-    const s = extractStatus("### Waiting on you\n| ID | Reply |\n|---|---|\n| SH1 | `a | b` |\n");
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| ID | Reply |\n|---|---|\n| SH1 | `a | b` |\n",
+    );
     expect(s?.waiting[0]?.text).toBe("Reply: a | b");
   });
 });
@@ -442,15 +444,9 @@ describe("the standard template: review fixes", () => {
   });
 
   test("hostile rows: empty, ID only, unclosed backtick, escaped trailing pipe", () => {
+    // A plain string: Bun escapes non-ASCII in String.raw templates, which would change the input.
     const s = extractStatus(
-      String.raw`### Waiting on you
-🟢 **Here**
-| | |
-|
-| SH1 |
-| SH2 | ${"`"}a | b |
-| SH3 | x \| y \|
-`,
+      "### Waiting on you\n🟢 **Here**\n| | |\n|\n| SH1 |\n| SH2 | `a | b |\n| SH3 | x \\| y \\|\n",
     );
     expect(s?.waiting).toEqual([
       { id: "SH1", text: "SH1", isNew: false, children: [] },
@@ -494,10 +490,8 @@ describe("the standard template: review fixes", () => {
     expect(ids("## Waiting on you — 5 items\n- SH1 a\n")).toEqual(["SH1"]);
   });
 
-  test("a group header written as a markdown heading is a group, not the end", () => {
-    expect(ids("### Waiting on you\n#### 🔴 Urgent\n- SH1 a\n#### ✅ Settled\n- SH2 b\n")).toEqual([
-      "SH1",
-    ]);
+  test("a group mark in a markdown heading is a heading: it ends the section", () => {
+    expect(ids("### Waiting on you\n- SH0 z\n#### 🔴 Urgent\n- SH1 a\n")).toEqual(["SH0"]);
   });
 
   test("the ID column wins over another cell that looks like an ID", () => {
@@ -598,5 +592,59 @@ describe("the standard template: second review fixes", () => {
     expect(extractStatus("**Progress: about 5% overall. Phase: release gate.**\n")?.phase).toBe(
       "release gate",
     );
+  });
+});
+
+describe("the standard template: third review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+  const timed = (md: string) => {
+    const t0 = performance.now();
+    extractStatus(md);
+    return performance.now() - t0;
+  };
+
+  test("nothing written as a line or a bullet, then an ID table: still nothing", () => {
+    const table = "\n\n| ID | State |\n|---|---|\n| SH1 | fixed |\n";
+    expect(extractStatus(`### Waiting on you\nnothing.${table}`)?.waiting).toEqual([]);
+    expect(extractStatus(`**Waiting on you:**\n- nothing${table}`)?.waiting).toEqual([]);
+  });
+
+  test("a plain list, then a separate table with ID rows outside a group: only the list", () => {
+    expect(
+      ids("**Waiting on you:**\n- Q1 approve\n\n| ID | State |\n|---|---|\n| Q0 | answered |\n"),
+    ).toEqual(["Q1"]);
+  });
+
+  test("a phase that opens with bold still parses, as before", () => {
+    const s = extractStatus("**Progress: about 50% overall. Phase: **release gate**.\n");
+    expect(s?.progressPct).toBe(50);
+    expect(s?.phase).not.toBeNull();
+  });
+
+  test("groups of plain ID lines (no bullets, no tables) give one item each", () => {
+    expect(
+      ids("**Waiting on you**\n🔴 **Urgent**\nSH1 approve deploy\n\n🟢 **Here**\nSH2 publish\n"),
+    ).toEqual(["SH1", "SH2"]);
+  });
+
+  test("whitespace runs before a \r or a line separator stay linear", () => {
+    const pad = " ".repeat(100_000);
+    for (const end of ["\r", " "]) {
+      expect(timed(`**Progress: about 5% overall. Phase:${pad}x${end}\n`)).toBeLessThan(1_000);
+      expect(timed(`**Waiting on you:**${pad}x${end}\n`)).toBeLessThan(1_000);
+      expect(timed(`### Waiting on you\n- ${pad}x${end}\n`)).toBeLessThan(1_000);
+    }
+    expect(extractStatus("**Progress: about 5% overall. Phase: release gate.**\r\n")?.phase).toBe(
+      "release gate",
+    );
+  });
+
+  test("a table as the very last line, in a group, with no newline", () => {
+    expect(ids("### Waiting on you\n🟢 **Here**\n| SH1 | x |")).toEqual(["SH1"]);
+  });
+
+  test("lines in the settled group are never recommendations", () => {
+    const s = extractStatus("### Waiting on you\n✅ **Settled**\n- SH1 → yes (recommended)\n");
+    expect(s?.recommendations).toEqual([]);
   });
 });

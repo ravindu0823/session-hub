@@ -13,19 +13,22 @@ export interface Status {
   recommendations: string[];
 }
 
+// Transcript text is untrusted and any size: a capture of "the rest of the line" is
+// "([\s\S]*)" with no "$" after it, so it can never fail and backtrack over a whitespace run
+// (".*$" fails on a "\r" or a line separator and retries every split of the run before it).
 const PROGRESS_RE =
-  /^\s*\*{0,2}Progress:\s*(?:about\s+)?(\d{1,3}(?:\.\d+)?)%\s+overall\.\s+Phase:\s*(.*)$/i;
+  /^\s*\*{0,2}Progress:\s*(?:about\s+)?(\d{1,3}(?:\.\d+)?)%\s+overall\.\s+Phase:\s*([\s\S]*)/i;
 // The tail "\s*(?:#+\s*)?$" fails in linear time on a long whitespace run (no two adjacent \s*).
 const REMAINING_HASH = /^\s{0,3}#{2,4}\s*\**what['\u2019]s remaining:?\**:?\s*(?:#+\s*)?$/i;
 /** "## Waiting on you", optionally with a count: "## Waiting on you \u2014 5 items". */
 const WAITING_HASH =
-  /^\s{0,3}#{2,4}\s*\**waiting on you:?\**:?\s*(?:#+\s*|[\u2013\u2014-]\s*\d+\s+items?\b.*)?$/i;
-const REMAINING_BOLD = /^\s*\*\*what['\u2019]s remaining:?\*\*:?\s*(.*)$/i;
-const WAITING_BOLD = /^\s*\*\*waiting on you:?\*\*:?\s*(.*)$/i;
+  /^\s{0,3}#{2,4}\s*\**waiting on you:?\**:?\s*(?:#+\s*|[\u2013\u2014-]\s*\d+\s+items?\b[\s\S]*)?$/i;
+const REMAINING_BOLD = /^\s*\*\*what['\u2019]s remaining:?\*\*:?\s*([\s\S]*)/i;
+const WAITING_BOLD = /^\s*\*\*waiting on you:?\*\*:?\s*([\s\S]*)/i;
 const ANY_HEADING = /^\s{0,3}#{1,6}(\s|$)/;
 const THEMATIC_BREAK = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
 const TABLE_ROW = /^\s*\|/;
-const BULLET_RE = /^(\s*)(?:\d+[.)]|[-*\u2022])\s+(.*)$/;
+const BULLET_RE = /^(\s*)(?:\d+[.)]|[-*\u2022])\s+([\s\S]*)/;
 const NEW_RE = /^(\*{0,2})New:(\*{0,2})\s*/i;
 /**
  * A question ID: segments of an upper-case letter and up to 7 upper-case letters or digits,
@@ -39,19 +42,20 @@ const RECOMMEND_RE = /recommend|my pick|\(recommended\)/i;
 const MAX_RECOMMENDATIONS = 5;
 
 // The standard "Waiting on you" template (the owner's global reply format): group headers, tables
-// with the ID in a cell, 🆕 for new items, and a ✅ group of settled items. Every pattern here is
-// anchored and bounded, and whitespace runs are handled without regex backtracking, because
-// transcript text is untrusted and can be any size.
+// with the ID in a cell, 🆕 for new items, and a ✅ group of settled items. Tables are read only
+// inside a group; outside one, a table ends the section as it always did. Patterns are anchored
+// and bounded; the 🆕 mark is removed by string split, not by a regex over whitespace.
 
 /** The standard template's "new" mark (🆕). */
 const NEW_MARK = "\u{1F195}";
 /** A cell longer than this is never an ID. */
 const MAX_ID_CELL = 64;
 const GROUP_EMOJI = "(\u{1F534}|\u{1F7E1}|\u{1F7E2}|⚪|✅)️?";
-/** "🔴 **Urgent**" or "**🔴 Urgent**", at indent 0 only: a mark inside an item is never one. */
+/**
+ * "🔴 **Urgent**" or "**🔴 Urgent**", at indent 0 only: a mark inside an item is never one. A
+ * markdown heading with a mark ("#### 🔴 Urgent") is a heading and ends the section.
+ */
 const GROUP_BOLD = new RegExp(`^(?:\\*\\*${GROUP_EMOJI}|${GROUP_EMOJI} ?\\*\\*)`, "u");
-/** "#### 🔴 Urgent": a level 3 to 6 heading ("## 🟢 Next steps" still ends the section). */
-const GROUP_HASH = new RegExp(`^#{3,6} +(?:\\*\\*)?${GROUP_EMOJI}`, "u");
 const SETTLED_MARK = "✅";
 /** "— 5 items (…)" alone after the Waiting on you heading: a count, not an item. */
 const COUNT_RE = /^[–—-]\s*\d+\s+items?\b(?:\s*\([^)\n]*\))?\s*$/i;
@@ -231,9 +235,10 @@ function parseItems(lines: string[]): RawItem[] {
       continue;
     }
     const indent = indentOf(/^\s*/.exec(line)?.[0] ?? "");
-    if (leadIn && hasBullets) {
-      // In a group, a plain line that opens with an ID is an item; any other is a lead-in.
-      if (idAt(stripMarkdown(line)) === null) continue;
+    if (leadIn) {
+      // The first plain line of a group starts a new item. Where the section uses bullets, only
+      // one that opens with an ID does; any other is a lead-in and is dropped.
+      if (hasBullets && idAt(stripMarkdown(line)) === null) continue;
       leadIn = false;
       items.push({ text: line.trim(), children: [] });
       lastIsChild = false;
@@ -343,10 +348,10 @@ export function extractStatus(markdown: string): Status | null {
   let phase: string | null = null;
   for (const line of lines) {
     const m = PROGRESS_RE.exec(line);
-    // The phase ends at the first "**" or at the end of the line, without a final ".": found by
-    // string search, since a lazy regex tail backtracks over a long whitespace run.
+    // The phase ends at the first "**" after its first character (as the old lazy "(.+?)" did) or
+    // at the end of the line, without a final ".": found by string search, not by a regex tail.
     const rest = m?.[2] ?? "";
-    const bold = rest.indexOf("**");
+    const bold = rest.indexOf("**", 1);
     let raw = bold === -1 ? rest.trimEnd() : rest.slice(0, bold);
     if (raw.endsWith(".")) raw = raw.slice(0, -1);
     if (m?.[1] && raw !== "") {
@@ -360,54 +365,26 @@ export function extractStatus(markdown: string): Status | null {
   let current: string[] | null = null;
   let kind: Kind | null = null;
   // The standard Waiting on you template: group headers, tables with the ID in a cell, and a
-  // settled group that holds no open items. Outside a group, a top-level table row with no ID
-  // ends the section as before (a summary table after "nothing." is not an item).
+  // settled group that holds no open items. Tables are read only inside a group; outside one,
+  // any table ends the section, exactly as before the template existed.
   let inGroup = false;
   let settled = false;
-  /** The section so far is only "nothing": a table after it is never an item. */
-  let onlyNothing = false;
   let head: TableHead | null = null;
   let pending: { cells: string[]; indent: number; at: number } | null = null;
-  /** The current table: open, top-level, and whether a row with an ID was seen. */
-  let table: { top: boolean; hasId: boolean } | null = null;
-  /** Table lines read as Waiting on you items: never recommendations. */
+  /** Lines read as table rows or settled items: never recommendations. */
   const consumed = new Set<number>();
-  const endSection = () => {
-    current = null;
-    kind = null;
-    pending = null;
-    head = null;
-    table = null;
-  };
-  /** Adds one row; false when it ended the section. */
-  const addRow = (cells: string[], h: TableHead | null, indent: number, at: number): boolean => {
+  const addRow = (cells: string[], h: TableHead | null, indent: number, at: number) => {
     const row = rowItem(cells, h);
-    if (row === null) return true;
-    if (indent === 0 && !row.hasId && !inGroup) {
-      endSection();
-      return false;
-    }
-    if (row.hasId && table) table.hasId = true;
+    if (row === null) return;
     consumed.add(at);
-    current?.push(`${" ".repeat(indent)}- ${row.line}`);
-    return true;
+    (current as string[] | null)?.push(`${" ".repeat(indent)}- ${row.line}`);
   };
-  const flushPending = (): boolean => {
+  /** A table ended: its first row, if no separator followed it, is a row too. */
+  const closeTable = () => {
     const p = pending;
     pending = null;
-    return p === null ? true : addRow(p.cells, null, p.indent, p.at);
-  };
-  /** A table ended. Outside a group, a top-level table with no ID row ends the section. */
-  const closeTable = (): boolean => {
-    if (!flushPending()) return false;
-    const t = table;
-    table = null;
     head = null;
-    if (t?.top && !t.hasId && !inGroup && current !== null) {
-      endSection();
-      return false;
-    }
-    return true;
+    if (p !== null) addRow(p.cells, null, p.indent, p.at);
   };
   lines.forEach((line, at) => {
     const heading = matchHeading(line);
@@ -419,26 +396,23 @@ export function extractStatus(markdown: string): Status | null {
       settled = false;
       sections[heading.kind].push(current);
       let rest = heading.rest;
-      if (heading.kind === "waiting")
+      if (heading.kind === "waiting") {
         rest = COUNT_RE.test(rest) ? "" : rest.replace(COUNT_PREFIX_RE, "");
-      onlyNothing = /^nothing\.?$/i.test(stripMarkdown(rest));
+      }
       if (rest !== "") current.push(`- ${rest}`);
       return;
     }
-    if (current !== null && kind === "waiting" && TABLE_ROW.test(line)) {
-      if (settled) {
+    const inWaiting = current !== null && kind === "waiting";
+    if (inWaiting && settled && !GROUP_BOLD.test(line)) {
+      if (!ANY_HEADING.test(line) && !THEMATIC_BREAK.test(line)) {
         consumed.add(at);
         return;
       }
+    }
+    if (inWaiting && inGroup && !settled && TABLE_ROW.test(line)) {
       const ws = line.slice(0, line.length - line.trimStart().length);
-      const indent = indentOf(ws);
-      if (table === null) {
-        if (indent === 0 && !inGroup && onlyNothing) {
-          endSection();
-          return;
-        }
-        table = { top: indent === 0, hasId: false };
-      }
+      // A table indented like a list continuation (2 or more) belongs to the item above it.
+      const indent = indentOf(ws) < 2 ? 0 : indentOf(ws);
       const cells = tableCells(line);
       if (isSeparator(cells)) {
         consumed.add(at);
@@ -448,28 +422,29 @@ export function extractStatus(markdown: string): Status | null {
         pending = null;
       } else if (head !== null) {
         addRow(cells, head, indent, at);
-      } else if (flushPending()) {
+      } else {
+        const p = pending;
+        if (p !== null) addRow(p.cells, null, p.indent, p.at);
         pending = { cells, indent, at };
       }
       return;
     }
-    if (!closeTable()) return;
-    if (current !== null && kind === "waiting") {
-      const group = GROUP_BOLD.exec(line) ?? GROUP_HASH.exec(line);
+    closeTable();
+    if (inWaiting) {
+      const group = GROUP_BOLD.exec(line);
       if (group) {
         inGroup = true;
         settled = (group[1] ?? group[2]) === SETTLED_MARK;
-        onlyNothing = false;
-        if (!settled) current.push(GROUP_START);
+        if (settled) consumed.add(at);
+        else (current as string[] | null)?.push(GROUP_START);
         return;
       }
-      if (settled && !ANY_HEADING.test(line) && !THEMATIC_BREAK.test(line)) return;
     }
     if (ANY_HEADING.test(line) || THEMATIC_BREAK.test(line) || TABLE_ROW.test(line)) {
-      endSection();
+      current = null;
+      kind = null;
       return;
     }
-    if (line.trim() !== "") onlyNothing = false;
     (current as string[] | null)?.push(line);
   });
   closeTable();
