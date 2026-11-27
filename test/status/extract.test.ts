@@ -142,8 +142,11 @@ describe("extractStatus", () => {
     expect(s?.waiting).toEqual([{ id: "Q1", text: "approve x", isNew: false, children: [] }]);
     const t = extractStatus("### Waiting on you\n- Q1 approve x\n---\n- Q2 no\n");
     expect(t?.waiting).toHaveLength(1);
-    const u = extractStatus("### Waiting on you\n- Q1 approve x\n| a | b |\n|---|---|\n");
-    expect(u?.waiting[0]?.text).toBe("approve x");
+    // Outside a template group, a table whose rows hold no ID ends the section, as before.
+    const u = extractStatus(
+      "### Waiting on you\n- Q1 approve x\n| a | b |\n|---|---|\n| c | d |\n- Q2 no\n",
+    );
+    expect(u?.waiting).toEqual([{ id: "Q1", text: "approve x", isNew: false, children: [] }]);
   });
 
   test("indented continuation after a blank line still joins", () => {
@@ -360,9 +363,13 @@ describe("the standard Waiting on you template (grouped, with tables)", () => {
     expect(s?.waiting.map((w) => w.id)).toEqual(["SH1"]);
   });
 
-  test("a table without a header row, and a row with no ID", () => {
+  test("a table without a header row; a row with no ID ends the section outside a group", () => {
     const s = extractStatus("### Waiting on you\n| SH1 | approve x |\n| nothing to do | here |\n");
-    expect(s?.waiting).toEqual([
+    expect(s?.waiting).toEqual([{ id: "SH1", text: "approve x", isNew: false, children: [] }]);
+    const g = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| SH1 | approve x |\n| nothing to do | here |\n",
+    );
+    expect(g?.waiting).toEqual([
       { id: "SH1", text: "approve x", isNew: false, children: [] },
       { id: null, text: "nothing to do · here", isNew: false, children: [] },
     ]);
@@ -379,5 +386,131 @@ describe("the standard Waiting on you template (grouped, with tables)", () => {
   test("a pipe inside a code span does not split a cell", () => {
     const s = extractStatus("### Waiting on you\n| ID | Reply |\n|---|---|\n| SH1 | `a | b` |\n");
     expect(s?.waiting[0]?.text).toBe("Reply: a | b");
+  });
+});
+
+describe("the standard template: review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+  const timed = (md: string) => {
+    const t0 = performance.now();
+    const s = extractStatus(md);
+    return { s, ms: performance.now() - t0 };
+  };
+
+  test("an indented ✅ line or a ✅ item in a plain list is not the settled group", () => {
+    expect(
+      ids("**Waiting on you:**\n- SH5 approve release\n  ✅ tests pass\n- SH6 rotate key\n"),
+    ).toEqual(["SH5", "SH6"]);
+    expect(ids("### Waiting on you\nSH1 approve\n✅ SH2 done\n")).toEqual(["SH1"]);
+    expect(ids("### Waiting on you\n- SH1 a\n- ✅ SH2 done\n- SH3 c\n")).toEqual([
+      "SH1",
+      null,
+      "SH3",
+    ]);
+  });
+
+  test("🆕 inside the bold keeps the ID, in a bullet and in a table cell", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🔴 **Urgent**\n- **SH84 🆕** do x\n\n🟢 **Here**\n| ID | What it is |\n|---|---|\n| **SH85 🆕** | Publish |\n",
+    );
+    expect(s?.waiting).toEqual([
+      { id: "SH84", text: "do x", isNew: true, children: [] },
+      { id: "SH85", text: "Publish", isNew: true, children: [] },
+    ]);
+  });
+
+  test("nothing, then a table that is not about waiting: still nothing", () => {
+    const s = extractStatus(
+      "**Waiting on you:** nothing.\n\n| Step | Status |\n|---|---|\n| build | done |\n",
+    );
+    expect(s?.waiting).toEqual([]);
+  });
+
+  test("an indented options table under an item becomes that item's children", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n- SH1 pick a plan\n  | Plan | Cost |\n  |---|---|\n  | A | 5 |\n  | B | 9 |\n- SH2 b\n",
+    );
+    expect(s?.waiting).toEqual([
+      {
+        id: "SH1",
+        text: "pick a plan",
+        isNew: false,
+        children: ["Plan: A · Cost: 5", "Plan: B · Cost: 9"],
+      },
+      { id: "SH2", text: "b", isNew: false, children: [] },
+    ]);
+  });
+
+  test("hostile rows: empty, ID only, unclosed backtick, escaped trailing pipe", () => {
+    const s = extractStatus(
+      String.raw`### Waiting on you
+🟢 **Here**
+| | |
+|
+| SH1 |
+| SH2 | ${"`"}a | b |
+| SH3 | x \| y \|
+`,
+    );
+    expect(s?.waiting).toEqual([
+      { id: "SH1", text: "SH1", isNew: false, children: [] },
+      { id: "SH2", text: "`a | b", isNew: false, children: [] },
+      { id: "SH3", text: "x | y |", isNew: false, children: [] },
+    ]);
+  });
+
+  test("huge rows and whitespace runs stay linear", () => {
+    const wide = `### Waiting on you\n🟢 **Here**\n|${" SH1 |".repeat(1)}${" x |".repeat(10_000)}\n`;
+    expect(timed(wide).ms).toBeLessThan(1_000);
+    const big = `### Waiting on you\n🟢 **Here**\n| SH1 | ${"a".repeat(1_000_000)} |\n`;
+    expect(timed(big).ms).toBeLessThan(1_000);
+    const spaces = `### Waiting on you\n- SH1 a\n${" ".repeat(100_000)}x\n${" ".repeat(100_000)}\n`;
+    expect(timed(spaces).ms).toBeLessThan(1_000);
+    const cell = `### Waiting on you\n🟢 **Here**\n| SH1 🆕${" ".repeat(100_000)}🆕 | b${" ".repeat(100_000)}🆕x |\n`;
+    expect(timed(cell).ms).toBeLessThan(1_000);
+  });
+
+  test("a lead-in line in a later group is dropped, and later groups are kept", () => {
+    expect(
+      ids(
+        "### Waiting on you\n🔴 **Urgent**\n- SH1 a\n\n🟢 **Here**\nType one reply per line:\n- SH2 b\n",
+      ),
+    ).toEqual(["SH1", "SH2"]);
+    expect(
+      ids("### Waiting on you\n🔴 **Urgent**\n- SH1 a\n🟢 **Here**\nlead-in\n- SH2 b\n"),
+    ).toEqual(["SH1", "SH2"]);
+    expect(
+      extractStatus("### Waiting on you\n🔴 **Urgent**\n- SH1 a\n🟢 **Here**\nlead-in\n- SH2 b\n")
+        ?.waiting[0]?.text,
+    ).toBe("a");
+  });
+
+  test("only a bare count after the heading is dropped; the hash heading may carry a count", () => {
+    expect(ids("**Waiting on you** — 1 item: SH1 approve deploy\n")).toEqual([null]);
+    expect(ids("**Waiting on you** — 2 items (🔴 1 urgent)\n- SH1 a\n- SH2 b\n")).toEqual([
+      "SH1",
+      "SH2",
+    ]);
+    expect(ids("## Waiting on you — 5 items\n- SH1 a\n")).toEqual(["SH1"]);
+  });
+
+  test("a group header written as a markdown heading is a group, not the end", () => {
+    expect(ids("### Waiting on you\n#### 🔴 Urgent\n- SH1 a\n#### ✅ Settled\n- SH2 b\n")).toEqual([
+      "SH1",
+    ]);
+  });
+
+  test("the ID column wins over another cell that looks like an ID", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| When | ID | What it is |\n|---|---|---|\n| Q4 | SH9 | Do it |\n",
+    );
+    expect(s?.waiting[0]?.id).toBe("SH9");
+  });
+
+  test("rows outside a waiting section still give recommendations", () => {
+    const s = extractStatus(
+      "| Plan | Note |\n|---|---|\n| A | (recommended) |\n\n**Waiting on you:** nothing.\n",
+    );
+    expect(s?.recommendations.length).toBe(1);
   });
 });
