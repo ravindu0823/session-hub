@@ -926,6 +926,150 @@ describe("hub mail hook: review fixes", () => {
   });
 });
 
+describe("hub mail statusline", () => {
+  function statusInput(sessionId?: string, extra: Record<string, unknown> = {}): void {
+    files.set(
+      "-",
+      JSON.stringify({
+        ...(sessionId === undefined ? {} : { session_id: sessionId }),
+        model: { display_name: "x" },
+        ...extra,
+      }),
+    );
+  }
+
+  let shared: Store | null = null;
+  afterEach(() => {
+    shared = null;
+  });
+
+  function rawMail(toRole = "beta"): void {
+    shared ??= open();
+    shared.mail().insert({
+      thread: "T",
+      fromRole: "alpha",
+      fromSession: null,
+      toRole,
+      kind: "task",
+      body: "please run the tests",
+      evidence: null,
+      createdAt: clock,
+      expiresAt: clock + 1e9,
+    });
+  }
+
+  const silent = { code: 0, out: [], err: [] };
+
+  test("no open mail prints nothing", async () => {
+    statusInput("s-beta");
+    expect(await run("mail", ["statusline"], {})).toEqual(silent);
+  });
+
+  test("counts queued mail and mail delivered to this session, nothing else", async () => {
+    open().upsertSession(session("s-beta2", { name: "beta", profile: "home" }));
+    for (let i = 0; i < 6; i++) rawMail();
+    rawMail("alpha");
+    const m = (shared ?? open()).mail();
+    m.claim("beta", "s-beta2", clock); // 1-6 delivered to the other beta session
+    for (let i = 0; i < 4; i++) rawMail(); // 8-11 queued
+    m.claim("beta", "s-beta", clock); // 8-11 delivered to this session
+    rawMail(); // 12 queued
+    m.ack(8, "beta", "s-beta", clock);
+    m.done(9, "beta", clock);
+    statusInput("s-beta");
+    expect(await run("mail", ["statusline"], {})).toEqual({ code: 0, out: ["✉ 3"], err: [] });
+    statusInput("s-beta2");
+    expect((await run("mail", ["statusline"], {})).out).toEqual(["✉ 7"]);
+  });
+
+  test("the session id comes only from the input, never the environment; no body is printed", async () => {
+    rawMail();
+    statusInput("s-beta");
+    const r = await run("mail", ["statusline"], ALPHA);
+    expect(r.out).toEqual(["✉ 1"]);
+    expect(r.out.join("")).not.toContain("please");
+    statusInput();
+    expect(await run("mail", ["statusline"], BETA)).toEqual(silent);
+  });
+
+  test("any problem is silent and exits 0", async () => {
+    rawMail();
+    files.set("-", "not json");
+    expect(await run("mail", ["statusline"], {})).toEqual(silent);
+    files.delete("-");
+    expect(await run("mail", ["statusline"], {})).toEqual(silent);
+    statusInput("bad id; rm");
+    expect(await run("mail", ["statusline"], {})).toEqual(silent);
+    statusInput("s-unknown");
+    expect(await run("mail", ["statusline"], {})).toEqual(silent);
+    statusInput("s-beta");
+    expect(await run("mail", ["statusline"], {}, { openStore: () => null })).toEqual(silent);
+    open().upsertSession(session("s-beta", { name: "beta", profile: "home", endedAt: 5000 }));
+    expect(await run("mail", ["statusline"], {})).toEqual(silent);
+  });
+
+  test("a bad roles.json or a failing index writes one stderr line with the class only", async () => {
+    rawMail();
+    statusInput("s-beta");
+    roles = "{ not json";
+    const r = await run("mail", ["statusline"], {});
+    expect(r.code).toBe(0);
+    expect(r.out).toEqual([]);
+    expect(r.err).toHaveLength(1);
+    expect(r.err[0]).toMatch(/^hub mail statusline: skipped \(\w+\)$/);
+  });
+
+  test("never waits for the daemon", async () => {
+    let sleeps = 0;
+    statusInput("s-unknown");
+    await run("mail", ["statusline"], {}, { sleep: async () => void sleeps++ });
+    expect(sleeps).toBe(0);
+  });
+
+  test("writes nothing to the index", async () => {
+    rawMail();
+    const raw = new Database(dbPath, { readonly: true });
+    try {
+      const version = () =>
+        (raw.query("PRAGMA data_version").get() as { data_version: number }).data_version;
+      const before = version();
+      statusInput("s-beta");
+      // The production open: no migration, so no transaction.
+      const prod = { openStore: () => Store.open(dbPath, { create: false, migrate: false }) };
+      expect((await run("mail", ["statusline"], {}, prod)).out).toEqual(["✉ 1"]);
+      expect(version()).toBe(before);
+      rawMail(); // the check sees a write by another connection
+      expect(version()).not.toBe(before);
+    } finally {
+      raw.close();
+    }
+  });
+
+  test("an older index: one stderr line naming the error class", async () => {
+    const old = join(dir, "old.db");
+    const raw = new Database(old, { create: true, strict: true });
+    raw.run("CREATE TABLE schema_version (version INTEGER NOT NULL)");
+    for (const m of MIGRATIONS.slice(0, 5)) raw.run(m);
+    raw.run("INSERT INTO schema_version (version) VALUES (1), (2), (3), (4), (5)");
+    raw.close();
+    statusInput("s-beta");
+    const r = await run(
+      "mail",
+      ["statusline"],
+      {},
+      {
+        openStore: () => Store.open(old, { create: false, migrate: false }),
+      },
+    );
+    expect(r).toEqual({ code: 0, out: [], err: ["hub mail statusline: skipped (IndexOutdated)"] });
+  });
+
+  test("extra arguments are a usage error, not a status line", async () => {
+    statusInput("s-beta");
+    expect((await run("mail", ["statusline", "x"], {})).code).toBe(2);
+  });
+});
+
 describe("hub mail wait (asyncRewake doorbell)", () => {
   function hookInput(event: string, sessionId: string): void {
     files.set("-", JSON.stringify({ hook_event_name: event, session_id: sessionId }));

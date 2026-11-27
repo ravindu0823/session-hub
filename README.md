@@ -296,6 +296,23 @@ under a monitor. Install a build that has `hub mail hook` before you add it, the
 }
 ```
 
+**Open mail in the status line.** `hub mail statusline` is a status line command. It reads only `session_id` from the
+status-line input, finds the session's role the same way and prints `✉ 3` when that role has three open mails
+(queued, or taken by this session and not acked); otherwise nothing. It never waits for the daemon, never takes or
+changes mail and always exits 0; an unexpected failure writes one stderr line with the error class only. Use it as
+the status line command, or have your own status line script run it with the same input and append its output. With
+`refreshInterval` set, the count also updates while the session is idle:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "\"C:\\path\\to\\hub.exe\" mail statusline",
+    "refreshInterval": 30
+  }
+}
+```
+
 Delivery is at least once: after `follow` starts again, or after mail went back to the queue, a message can arrive
 twice (marked `"redelivered": true`), so handle each id once.
 
