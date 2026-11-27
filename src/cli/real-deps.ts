@@ -12,6 +12,7 @@ import { realClaudeCli } from "../discovery/agents.ts";
 import { runMailCli } from "../mail/cli.ts";
 import { parseRolesConfig, type RolesConfig, rolesLoader } from "../mail/roles.ts";
 import { insideClaudeCode, mailUpkeep, withoutSessionEnv } from "../mail/service.ts";
+import { fileWaiterState, processAlive } from "../mail/waiter.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
 import { claimMarkerFile, runGuard } from "../send/guard.ts";
@@ -327,6 +328,10 @@ export function realCliDeps(opts: {
         readInput: async (p) => (p === "-" ? await Bun.stdin.text() : readFileSync(p, "utf8")),
         sleep: (ms) => Bun.sleep(ms),
         exists: (p) => existsSync(p),
+        waiter: fileWaiterState(join(paths.runDir, "waiters"), {
+          pid: process.pid,
+          alive: processAlive,
+        }),
         // `hub` is not on PATH in every shell a session uses: the hook text names this exe.
         ...(compiled ? { selfCommand: process.execPath } : {}),
       }),

@@ -111,6 +111,9 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   `session_id` are used; the rest (a UserPromptSubmit prompt included) is parsed and dropped, never stored or logged.
   `hub mail statusline` reads Claude Code's status-line input on stdin: only `session_id` is used; the rest is parsed
   and dropped, never stored or logged.
+  `hub mail wait` reads the same hook input as `hub mail hook` (only `hook_event_name` and `session_id`) and keeps
+  `run\waiters\<session id>.lock` (its pid) and `.rung` (a mail id) per session; its stderr doorbell names only mail
+  ids, kinds and sender roles.
 
 ## Target architecture
 - Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index and owns its schema; the TUI and the

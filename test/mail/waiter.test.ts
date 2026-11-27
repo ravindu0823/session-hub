@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileWaiterState } from "../../src/mail/waiter";
+import { fileWaiterState, processAlive } from "../../src/mail/waiter";
 
 let dir: string;
 beforeEach(() => {
@@ -68,4 +68,9 @@ describe("file waiter state", () => {
     a.setRung("../x", 1);
     expect(existsSync(join(dir, "x.rung"))).toBe(false);
   });
+});
+
+test("processAlive: this process is alive, a pid that does not exist is not", () => {
+  expect(processAlive(process.pid)).toBe(true);
+  expect(processAlive(2_147_483_000)).toBe(false);
 });

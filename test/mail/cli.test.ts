@@ -1082,7 +1082,11 @@ describe("hub mail wait (asyncRewake doorbell)", () => {
     return {
       locks,
       rung,
-      claim: (s: string) => (locks.has(s) ? false : (locks.add(s), true)),
+      claim: (s: string) => {
+        if (locks.has(s)) return false;
+        locks.add(s);
+        return true;
+      },
       release: (s: string) => void locks.delete(s),
       lastRung: (s: string) => rung.get(s) ?? null,
       setRung: (s: string, id: number) => void rung.set(s, id),
