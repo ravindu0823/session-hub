@@ -14,7 +14,7 @@ export interface Status {
 }
 
 const PROGRESS_RE =
-  /^\s*\*{0,2}Progress:\s*(?:about\s+)?(\d{1,3}(?:\.\d+)?)%\s+overall\.\s+Phase:\s*(.+?)\.?(?:\*\*|\s*$)/i;
+  /^\s*\*{0,2}Progress:\s*(?:about\s+)?(\d{1,3}(?:\.\d+)?)%\s+overall\.\s+Phase:\s*(.*)$/i;
 // The tail "\s*(?:#+\s*)?$" fails in linear time on a long whitespace run (no two adjacent \s*).
 const REMAINING_HASH = /^\s{0,3}#{2,4}\s*\**what['\u2019]s remaining:?\**:?\s*(?:#+\s*)?$/i;
 /** "## Waiting on you", optionally with a count: "## Waiting on you \u2014 5 items". */
@@ -48,15 +48,17 @@ const NEW_MARK = "\u{1F195}";
 /** A cell longer than this is never an ID. */
 const MAX_ID_CELL = 64;
 const GROUP_EMOJI = "(\u{1F534}|\u{1F7E1}|\u{1F7E2}|⚪|✅)️?";
-/** "🔴 **Urgent**" or "**🔴 Urgent**", at indent 0 to 3: an indented "✅ tests pass" is not one. */
-const GROUP_BOLD = new RegExp(`^ {0,3}(?:\\*\\*${GROUP_EMOJI}|${GROUP_EMOJI} ?\\*\\*)`, "u");
-/** "#### 🔴 Urgent": a group header written as a markdown heading. */
-const GROUP_HASH = new RegExp(`^ {0,3}#{1,6} +(?:\\*\\*)?${GROUP_EMOJI}`, "u");
+/** "🔴 **Urgent**" or "**🔴 Urgent**", at indent 0 only: a mark inside an item is never one. */
+const GROUP_BOLD = new RegExp(`^(?:\\*\\*${GROUP_EMOJI}|${GROUP_EMOJI} ?\\*\\*)`, "u");
+/** "#### 🔴 Urgent": a level 3 to 6 heading ("## 🟢 Next steps" still ends the section). */
+const GROUP_HASH = new RegExp(`^#{3,6} +(?:\\*\\*)?${GROUP_EMOJI}`, "u");
 const SETTLED_MARK = "✅";
 /** "— 5 items (…)" alone after the Waiting on you heading: a count, not an item. */
 const COUNT_RE = /^[–—-]\s*\d+\s+items?\b(?:\s*\([^)\n]*\))?\s*$/i;
-/** Marks a group start for parseItems: a fresh list, so a lead-in line there is dropped. */
-const GROUP_START = "";
+/** "— 1 item: SH1 approve": the count before the colon is dropped, the item after it kept. */
+const COUNT_PREFIX_RE = /^[–—-]\s*\d+\s+items?\b[^:\n]*:\s*/i;
+/** Marks a group start for parseItems (a private-use character): a fresh list. */
+const GROUP_START = String.fromCharCode(0xe001);
 
 /** The text without 🆕 and the whitespace before each one; linear in the text. */
 function withoutNewMark(s: string): string {
@@ -100,21 +102,30 @@ function isIdCell(c: string): boolean {
   return plain !== "" && idAt(plain) === plain;
 }
 
+/** A table's header row, prepared once: plain labels and the column headed "ID" (or -1). */
+interface TableHead {
+  labels: string[];
+  idCol: number;
+}
+
+function tableHead(cells: string[]): TableHead {
+  const labels = cells.map(stripMarkdown);
+  return { labels, idCol: labels.findIndex((l) => l.toLowerCase() === "id") };
+}
+
 /**
  * One table row as an item line: the ID cell first (the column headed "ID" when there is one,
  * else the first cell that is exactly an ID), then the other cells, each labelled with its column
- * header unless the column is the "What" one. Null for a row with no text at all.
+ * header unless the column is the "What" one. Null for a row with no text at all. Linear in the
+ * row: the header was prepared once (tableHead).
  */
-function rowItem(
-  cells: string[],
-  headers: string[] | null,
-): { line: string; hasId: boolean } | null {
-  const idCol = headers?.findIndex((h) => stripMarkdown(h).toLowerCase() === "id") ?? -1;
+function rowItem(cells: string[], head: TableHead | null): { line: string; hasId: boolean } | null {
+  const idCol = head?.idCol ?? -1;
   const at = idCol !== -1 && isIdCell(cells[idCol] ?? "") ? idCol : cells.findIndex(isIdCell);
   const parts: { text: string; what: boolean }[] = [];
   cells.forEach((c, i) => {
     if (i === at || c === "") return;
-    const h = headers?.[i] ? stripMarkdown(headers[i] as string) : "";
+    const h = head?.labels[i] ?? "";
     const what = h === "" || /^what\b/i.test(h);
     parts.push({ text: what ? c : `${h}: ${c}`, what });
   });
@@ -219,9 +230,18 @@ function parseItems(lines: string[]): RawItem[] {
       blankSeen = false;
       continue;
     }
-    if (leadIn && hasBullets) continue;
-    const last = items[items.length - 1];
     const indent = indentOf(/^\s*/.exec(line)?.[0] ?? "");
+    if (leadIn && hasBullets) {
+      // In a group, a plain line that opens with an ID is an item; any other is a lead-in.
+      if (idAt(stripMarkdown(line)) === null) continue;
+      leadIn = false;
+      items.push({ text: line.trim(), children: [] });
+      lastIsChild = false;
+      lastIndent = indent;
+      blankSeen = false;
+      continue;
+    }
+    const last = items[items.length - 1];
     if (!last) {
       if (hasBullets) continue;
       items.push({ text: line.trim(), children: [] });
@@ -323,9 +343,15 @@ export function extractStatus(markdown: string): Status | null {
   let phase: string | null = null;
   for (const line of lines) {
     const m = PROGRESS_RE.exec(line);
-    if (m?.[1] && m[2]) {
+    // The phase ends at the first "**" or at the end of the line, without a final ".": found by
+    // string search, since a lazy regex tail backtracks over a long whitespace run.
+    const rest = m?.[2] ?? "";
+    const bold = rest.indexOf("**");
+    let raw = bold === -1 ? rest.trimEnd() : rest.slice(0, bold);
+    if (raw.endsWith(".")) raw = raw.slice(0, -1);
+    if (m?.[1] && raw !== "") {
       progressPct = Math.min(100, Math.max(0, Math.round(Number(m[1]))));
-      phase = stripMarkdown(m[2]);
+      phase = stripMarkdown(raw);
       break;
     }
   }
@@ -338,24 +364,30 @@ export function extractStatus(markdown: string): Status | null {
   // ends the section as before (a summary table after "nothing." is not an item).
   let inGroup = false;
   let settled = false;
-  let headers: string[] | null = null;
+  /** The section so far is only "nothing": a table after it is never an item. */
+  let onlyNothing = false;
+  let head: TableHead | null = null;
   let pending: { cells: string[]; indent: number; at: number } | null = null;
+  /** The current table: open, top-level, and whether a row with an ID was seen. */
+  let table: { top: boolean; hasId: boolean } | null = null;
   /** Table lines read as Waiting on you items: never recommendations. */
   const consumed = new Set<number>();
   const endSection = () => {
     current = null;
     kind = null;
     pending = null;
-    headers = null;
+    head = null;
+    table = null;
   };
   /** Adds one row; false when it ended the section. */
-  const addRow = (cells: string[], hdrs: string[] | null, indent: number, at: number): boolean => {
-    const row = rowItem(cells, hdrs);
+  const addRow = (cells: string[], h: TableHead | null, indent: number, at: number): boolean => {
+    const row = rowItem(cells, h);
     if (row === null) return true;
     if (indent === 0 && !row.hasId && !inGroup) {
       endSection();
       return false;
     }
+    if (row.hasId && table) table.hasId = true;
     consumed.add(at);
     current?.push(`${" ".repeat(indent)}- ${row.line}`);
     return true;
@@ -365,43 +397,69 @@ export function extractStatus(markdown: string): Status | null {
     pending = null;
     return p === null ? true : addRow(p.cells, null, p.indent, p.at);
   };
+  /** A table ended. Outside a group, a top-level table with no ID row ends the section. */
+  const closeTable = (): boolean => {
+    if (!flushPending()) return false;
+    const t = table;
+    table = null;
+    head = null;
+    if (t?.top && !t.hasId && !inGroup && current !== null) {
+      endSection();
+      return false;
+    }
+    return true;
+  };
   lines.forEach((line, at) => {
     const heading = matchHeading(line);
     if (heading) {
-      flushPending();
+      closeTable();
       current = [];
       kind = heading.kind;
       inGroup = false;
       settled = false;
-      headers = null;
       sections[heading.kind].push(current);
-      const countOnly = heading.kind === "waiting" && COUNT_RE.test(heading.rest);
-      if (heading.rest !== "" && !countOnly) current.push(`- ${heading.rest}`);
+      let rest = heading.rest;
+      if (heading.kind === "waiting")
+        rest = COUNT_RE.test(rest) ? "" : rest.replace(COUNT_PREFIX_RE, "");
+      onlyNothing = /^nothing\.?$/i.test(stripMarkdown(rest));
+      if (rest !== "") current.push(`- ${rest}`);
       return;
     }
     if (current !== null && kind === "waiting" && TABLE_ROW.test(line)) {
-      if (settled) return;
-      const indent = line.length - line.trimStart().length;
+      if (settled) {
+        consumed.add(at);
+        return;
+      }
+      const ws = line.slice(0, line.length - line.trimStart().length);
+      const indent = indentOf(ws);
+      if (table === null) {
+        if (indent === 0 && !inGroup && onlyNothing) {
+          endSection();
+          return;
+        }
+        table = { top: indent === 0, hasId: false };
+      }
       const cells = tableCells(line);
       if (isSeparator(cells)) {
-        if (pending !== null) consumed.add(pending.at);
         consumed.add(at);
-        headers = pending?.cells ?? null;
+        if (head !== null) return;
+        if (pending !== null) consumed.add(pending.at);
+        head = tableHead(pending?.cells ?? []);
         pending = null;
-      } else if (headers !== null) {
-        addRow(cells, headers, indent, at);
+      } else if (head !== null) {
+        addRow(cells, head, indent, at);
       } else if (flushPending()) {
         pending = { cells, indent, at };
       }
       return;
     }
-    if (!flushPending()) return;
-    headers = null;
+    if (!closeTable()) return;
     if (current !== null && kind === "waiting") {
       const group = GROUP_BOLD.exec(line) ?? GROUP_HASH.exec(line);
       if (group) {
         inGroup = true;
         settled = (group[1] ?? group[2]) === SETTLED_MARK;
+        onlyNothing = false;
         if (!settled) current.push(GROUP_START);
         return;
       }
@@ -411,9 +469,10 @@ export function extractStatus(markdown: string): Status | null {
       endSection();
       return;
     }
+    if (line.trim() !== "") onlyNothing = false;
     (current as string[] | null)?.push(line);
   });
-  flushPending();
+  closeTable();
 
   const hasSection = sections.remaining.length > 0 || sections.waiting.length > 0;
   if (progressPct === null && !hasSection) return null;
