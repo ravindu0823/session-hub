@@ -1,3 +1,4 @@
+import { runGuardCli } from "../guard/cli.ts";
 import { IndexOutdated, type Store } from "../store/db.ts";
 import { cleanText } from "../tui/sanitize.ts";
 import {
@@ -53,6 +54,9 @@ export interface MailCliDeps {
   selfCommand?: string;
   /** How long a SessionStart `hub mail hook` waits for the daemon to index the session (5 s). */
   hookWaitMs?: number;
+  /** `hub guard`'s owner pauses (`guard-off.json` in the data folder); null when there is none. */
+  readGuardOff?(): string | null;
+  writeGuardOff?(text: string): void;
 }
 
 export const MAIL_USAGE = [
@@ -565,6 +569,7 @@ function bareLine(role: string): RoleLine {
     plugins: [],
     telegramChats: [],
     questionPrefix: null,
+    guard: null,
     problems: [],
   };
 }
@@ -785,7 +790,7 @@ const COMMANDS: Record<string, (c: Ctx, args: readonly string[]) => Promise<numb
   roles: cmdRoles,
 };
 
-export const MAIL_COMMANDS: readonly string[] = Object.keys(COMMANDS);
+export const MAIL_COMMANDS: readonly string[] = [...Object.keys(COMMANDS), "guard"];
 
 /** Runs `hub mail|ask|answer|decisions|roles`. Exit code: 0 ok, 1 refused or failed, 2 usage. */
 export async function runMailCli(
@@ -803,6 +808,7 @@ export async function runMailCli(
     err: (line) => deps.err(safe(line)),
   };
   if (cmd === "mail" && args.length === 1 && args[0] === "hook") return runMailHook(d);
+  if (cmd === "guard") return runGuardCli(args, d);
   if (cmd === "mail" && args.length === 1 && args[0] === "statusline") return runMailStatusline(d);
   const label = `hub ${cmd}`;
   const run = COMMANDS[cmd];

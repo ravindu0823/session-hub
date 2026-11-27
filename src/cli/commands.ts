@@ -96,6 +96,7 @@ export const USAGE = [
   "  hub ask | answer | decisions",
   "                          the owner's decision list (see hub mail --help)",
   "  hub roles               roles, their live sessions and queued mail",
+  "  hub guard               (PreToolUse hook) a role's tool policy; hub guard --help",
   "  hub --version           print the version",
   "  hub --help              print this help",
 ].join("\n");

@@ -11,6 +11,9 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
 
 ### Added
 
+- `hub guard`: a PreToolUse hook command that applies an optional per-role tool policy from `roles.json` (tools and
+  agent types to block, folders writes are limited to, a reason); roles without a policy are never affected, and every
+  problem lets the call through. The owner pauses a policy with `hub guard off` from outside Claude Code. (#47)
 - `hub mail hook`: a `SessionStart` / `UserPromptSubmit` hook command that names a live session's open mail (ids,
   kinds and sender roles, never the text) as one line of context, so mail no longer waits until the session polls.
   Silent with no mail and on every problem; changes nothing. (#38)

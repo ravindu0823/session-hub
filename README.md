@@ -334,6 +334,43 @@ says it was recorded outside Claude Code and is not proof of who sent it. The ma
 `hub.db`; after an update they refuse to run until the new daemon has upgraded it. Mail that looks like it holds a token, key, password or
 card number is refused.
 
+**Role guard.** A role in `roles.json` can carry a tool policy, for example to keep a coordinating session from
+doing work that belongs to other sessions:
+
+```json
+{
+  "role": "lead",
+  "guard": {
+    "denyTools": ["mcp__deploy*", "WebFetch"],
+    "denyAgents": ["general-purpose", "Explore", "Plan", "ops-*"],
+    "writeOnlyUnder": ["C:\\work\\lead-notes"],
+    "reason": "lead is the coordinator: hand this to the session that owns it"
+  }
+}
+```
+
+Names are exact or end in `*` (a prefix). `denyAgents` applies to the Agent tool's agent type (no type counts as
+`general-purpose`); `writeOnlyUnder` limits Edit, Write, MultiEdit and NotebookEdit. `hub guard` is the PreToolUse
+hook that applies it: a denied call is blocked (exit 2) with the reason, which the session sees. Sessions of roles
+without a policy are never affected, and when no role has a policy the hook does not even open the index. Any problem
+(no index, an unknown session, bad input) lets the call through: the guard is a guard rail, not a sandbox, and it does
+not look at Bash. Add it to each profile's `settings.json`, matched on the tools your policies name:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Agent|Task|Edit|Write|MultiEdit|NotebookEdit|WebFetch|mcp__deploy.*",
+        "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" guard", "timeout": 10 }] }
+    ]
+  }
+}
+```
+
+The owner pauses a policy from a terminal outside Claude Code with `hub guard off --role lead --minutes 30` (at most
+480) and ends the pause with `hub guard on --role lead`; `hub guard status` lists policies and pauses. Sessions are
+refused these commands.
+
 ## Security and privacy
 
 - **No network listener of any kind.** The terminal app and the daemon share only the SQLite file `hub.db`. The tray
