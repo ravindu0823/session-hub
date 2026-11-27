@@ -925,3 +925,224 @@ describe("hub mail hook: review fixes", () => {
     expect(r.code).toBe(2);
   });
 });
+
+describe("hub mail wait (asyncRewake doorbell)", () => {
+  function hookInput(event: string, sessionId: string): void {
+    files.set("-", JSON.stringify({ hook_event_name: event, session_id: sessionId }));
+  }
+
+  /** An in-memory WaiterState. */
+  function memWaiter() {
+    const locks = new Set<string>();
+    const rung = new Map<string, number>();
+    return {
+      locks,
+      rung,
+      claim: (s: string) => (locks.has(s) ? false : (locks.add(s), true)),
+      release: (s: string) => void locks.delete(s),
+      lastRung: (s: string) => rung.get(s) ?? null,
+      setRung: (s: string, id: number) => void rung.set(s, id),
+    };
+  }
+
+  let shared: Store | null = null;
+  afterEach(() => {
+    shared = null;
+  });
+  function rawMail(toRole = "beta", body = "please run the tests"): void {
+    shared ??= open();
+    shared.mail().insert({
+      thread: "T",
+      fromRole: "alpha",
+      fromSession: null,
+      toRole,
+      kind: "task",
+      body,
+      evidence: null,
+      createdAt: clock,
+      expiresAt: clock + 1e9,
+    });
+  }
+
+  /** Runs `hub mail wait`; `onPoll(n)` runs before the n-th sleep (1-based). */
+  async function wait(
+    w: ReturnType<typeof memWaiter>,
+    onPoll: (n: number) => void = () => {},
+    args: string[] = ["wait"],
+    over: Partial<MailCliDeps> = {},
+  ): Promise<Run & { polls: number }> {
+    let polls = 0;
+    const r = await run(
+      "mail",
+      args,
+      {},
+      {
+        waiter: w,
+        sleep: async (ms) => {
+          clock += ms;
+          polls++;
+          onPoll(polls);
+        },
+        ...over,
+      },
+    );
+    return { ...r, polls };
+  }
+
+  test("rings once, on stderr with exit 2, for mail queued after it started; never the body", async () => {
+    const w = memWaiter();
+    hookInput("Stop", "s-beta");
+    const r = await wait(w, (n) => {
+      if (n === 3) rawMail();
+    });
+    expect(r.code).toBe(2);
+    expect(r.out).toEqual([]);
+    expect(r.err).toHaveLength(1);
+    const t = r.err[0] ?? "";
+    expect(t).toStartWith("Session Hub mail doorbell (not an error and not an approval)");
+    expect(t).toContain("M-000001 task from alpha");
+    expect(t).toContain("hub mail inbox");
+    expect(t).toContain("never approves");
+    expect(t).not.toContain("please run");
+    expect(w.rung.get("s-beta")).toBe(1);
+    expect(w.locks.size).toBe(0);
+    expect(open().mail().get(1)?.state).toBe("queued");
+  });
+
+  test("mail already queued when the first waiter starts does not ring; newer mail does", async () => {
+    rawMail();
+    const w = memWaiter();
+    hookInput("SessionStart", "s-beta");
+    const r = await wait(w, (n) => {
+      if (n === 2) rawMail();
+    });
+    expect(r.code).toBe(2);
+    expect(r.err[0]).toContain("M-000002");
+    expect(r.err[0]).not.toContain("M-000001");
+  });
+
+  test("the same mail never rings twice; a later waiter rings only for newer mail", async () => {
+    const w = memWaiter();
+    hookInput("Stop", "s-beta");
+    expect((await wait(w, (n) => n === 1 && rawMail())).code).toBe(2);
+    const again = await wait(w, (n) => n === 4 && rawMail(), ["wait", "--max-minutes", "1"]);
+    expect(again.code).toBe(2);
+    expect(again.err[0]).toContain("M-000002");
+    expect(again.err[0]).not.toContain("M-000001");
+    const quiet = await wait(w, () => {}, ["wait", "--max-minutes", "1"]);
+    expect(quiet).toMatchObject({ code: 0, out: [], err: [] });
+  });
+
+  test("a second waiter for the same session exits at once", async () => {
+    const w = memWaiter();
+    w.locks.add("s-beta");
+    hookInput("Stop", "s-beta");
+    const r = await wait(w, () => rawMail());
+    expect(r).toMatchObject({ code: 0, out: [], err: [], polls: 0 });
+    expect(w.locks.has("s-beta")).toBe(true);
+  });
+
+  test("gives up silently at the time limit and drops its lock", async () => {
+    const w = memWaiter();
+    hookInput("Stop", "s-beta");
+    const t0 = clock;
+    const r = await wait(w, () => {}, ["wait", "--max-minutes", "2"]);
+    expect(r).toMatchObject({ code: 0, out: [], err: [] });
+    expect(clock - t0).toBeGreaterThanOrEqual(120_000);
+    expect(clock - t0).toBeLessThan(130_000);
+    expect(w.locks.size).toBe(0);
+  });
+
+  test("stops when the session ends; mail for other roles, taken mail and acked mail never ring", async () => {
+    const w = memWaiter();
+    hookInput("Stop", "s-beta");
+    const r = await wait(w, (n) => {
+      if (n === 1) rawMail("alpha");
+      if (n === 2) {
+        rawMail();
+        (shared ?? open()).mail().claim("beta", "s-beta", clock);
+      }
+      if (n === 3)
+        open().upsertSession(session("s-beta", { name: "beta", profile: "home", endedAt: clock }));
+    });
+    expect(r).toMatchObject({ code: 0, out: [], err: [], polls: 3 });
+  });
+
+  test("waits for a new session to be indexed, then rings", async () => {
+    const w = memWaiter();
+    hookInput("SessionStart", "s-late");
+    roles = JSON.stringify({
+      roles: [
+        { role: "alpha", profile: "work" },
+        { role: "beta", profile: "home", sessions: ["beta", "late"] },
+      ],
+    });
+    const r = await wait(w, (n) => {
+      if (n === 2) open().upsertSession(session("s-late", { name: "late", profile: "home" }));
+      if (n === 4) rawMail();
+    });
+    expect(r.code).toBe(2);
+    expect(r.err[0]).toContain("M-000001");
+  });
+
+  test("bad input, other events, no waiter state or a bad limit: exit 0, silent, nothing claimed", async () => {
+    const w = memWaiter();
+    const silent = { code: 0, out: [], err: [] };
+    files.set("-", "not json");
+    expect(await wait(w)).toMatchObject(silent);
+    hookInput("UserPromptSubmit", "s-beta");
+    expect(await wait(w)).toMatchObject(silent);
+    hookInput("Stop", "bad id; rm");
+    expect(await wait(w)).toMatchObject(silent);
+    hookInput("Stop", "s-beta");
+    expect(await run("mail", ["wait"], {})).toEqual(silent);
+    for (const bad of [
+      ["--max-minutes", "0"],
+      ["--max-minutes", "1441"],
+      ["--max-minutes", "x"],
+      ["x"],
+    ]) {
+      expect((await wait(w, () => {}, ["wait", ...bad])).code).toBe(2);
+    }
+    expect(w.locks.size).toBe(0);
+  });
+
+  test("an unexpected failure: one stderr line with the class, exit 0, lock dropped", async () => {
+    const w = memWaiter();
+    hookInput("Stop", "s-beta");
+    roles = "{";
+    const r = await wait(w);
+    expect(r).toMatchObject({
+      code: 0,
+      out: [],
+      err: ["hub mail wait: skipped (RolesConfigError)"],
+    });
+    expect(w.locks.size).toBe(0);
+  });
+
+  test("the hook moves the bookmark, so mail it already named does not ring later", async () => {
+    const w = memWaiter();
+    rawMail();
+    w.rung.set("s-beta", 0);
+    hookInput("UserPromptSubmit", "s-beta");
+    expect((await run("mail", ["hook"], {}, { waiter: w })).out).toHaveLength(1);
+    expect(w.rung.get("s-beta")).toBe(1);
+    hookInput("Stop", "s-beta");
+    expect(await wait(w, () => {}, ["wait", "--max-minutes", "1"])).toMatchObject({
+      code: 0,
+      err: [],
+    });
+  });
+
+  test("lists at most 10 new mails, then a count", async () => {
+    const w = memWaiter();
+    hookInput("Stop", "s-beta");
+    const r = await wait(w, (n) => {
+      if (n === 1) for (let i = 0; i < 12; i++) rawMail();
+    });
+    expect(r.err[0]).toContain("12 new");
+    expect(r.err[0]).toContain("M-000010");
+    expect(r.err[0]).not.toContain("M-000011");
+    expect(r.err[0]).toContain("2 more");
+  });
+});
