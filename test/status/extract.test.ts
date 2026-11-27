@@ -717,3 +717,44 @@ describe("the standard template: final review fixes", () => {
     expect(extractStatus("**Progress: about 50% overall. Phase:  \n")?.progressPct).toBe(50);
   });
 });
+
+describe("the standard template: fifth review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+
+  test("a long header label times many rows stays bounded", () => {
+    const md = `### Waiting on you\n🟢 **Here**\n| ${"A".repeat(100_000)} |\n|---|\n${"| x |\n".repeat(10_000)}`;
+    const t0 = performance.now();
+    const s = extractStatus(md);
+    expect(performance.now() - t0).toBeLessThan(1_000);
+    const total = (s?.waiting ?? []).reduce((n, w) => n + w.text.length, 0);
+    expect(total).toBeLessThan(200_000);
+  });
+
+  test("a line ending at Phase: is not progress, as on main; Phase: . gives '.'", () => {
+    const s = extractStatus(
+      "**Progress: about 10% overall. Phase:\n**Progress: about 60% overall. Phase: build.**\n",
+    );
+    expect(s?.progressPct).toBe(60);
+    expect(extractStatus("**Progress: about 50% overall. Phase: .\n")?.phase).toBe(".");
+  });
+
+  test("a group title that only opens with an ID-like word is still a group", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🔴 **P0 blockers**\n| ID | What |\n|---|---|\n| SH1 | a |\n",
+    );
+    expect(s?.waiting.map((w) => w.id)).toEqual(["SH1"]);
+    expect(ids("### Waiting on you\n🔴**SH2** approve\n- SH3 c\n")).toEqual(["SH3"]);
+    expect(ids("### Waiting on you\n- SH1 a\n🔴 **🆕 SH2** x\n- SH3 c\n")).toEqual(["SH1", "SH3"]);
+  });
+
+  test("after the settled group and a note, a later open group is kept", () => {
+    expect(
+      ids("### Waiting on you\n✅ **Settled**\n- SH0\n\nNote.\n\n🔴 **Urgent**\n- SH1\n"),
+    ).toEqual(["SH1"]);
+  });
+
+  test("a line that is exactly the private-use marker character changes nothing", () => {
+    const mark = String.fromCharCode(0xe001);
+    expect(ids(`### Waiting on you\n- SH1 a\n\n${mark}\nSH2 b\n`)).toEqual(["SH1"]);
+  });
+});

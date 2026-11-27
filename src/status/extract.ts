@@ -17,7 +17,7 @@ export interface Status {
 // "([\s\S]*)" with no "$" after it, so it can never fail and backtrack over a whitespace run
 // (".*$" fails on a "\r" or a line separator and retries every split of the run before it).
 const PROGRESS_RE =
-  /^\s*\*{0,2}Progress:\s*(?:about\s+)?(\d{1,3}(?:\.\d+)?)%\s+overall\.\s+Phase:\s*([\s\S]*)/i;
+  /^\s*\*{0,2}Progress:\s*(?:about\s+)?(\d{1,3}(?:\.\d+)?)%\s+overall\.\s+Phase:(\s*)([\s\S]*)/i;
 // The tail "\s*(?:#+\s*)?$" fails in linear time on a long whitespace run (no two adjacent \s*).
 const REMAINING_HASH = /^\s{0,3}#{2,4}\s*\**what['\u2019]s remaining:?\**:?\s*(?:#+\s*)?$/i;
 /** "## Waiting on you", optionally with a count: "## Waiting on you \u2014 5 items". */
@@ -50,6 +50,10 @@ const MAX_RECOMMENDATIONS = 5;
 const NEW_MARK = "\u{1F195}";
 /** A cell longer than this is never an ID. */
 const MAX_ID_CELL = 64;
+/** A header label longer than this is not repeated on each row (it would multiply the output). */
+const MAX_LABEL = 40;
+/** Rows read from one table; the rest are ignored (bounds the output of one table). */
+const MAX_TABLE_ROWS = 200;
 const GROUP_EMOJI = "(\u{1F534}|\u{1F7E1}|\u{1F7E2}|⚪|✅)️?";
 /**
  * "🔴 **Urgent**" or "**🔴 Urgent**", at indent 0 only: a mark inside an item is never one. A
@@ -59,22 +63,35 @@ const GROUP_BOLD = new RegExp(`^(?:\\*\\*${GROUP_EMOJI}|${GROUP_EMOJI} ?\\*\\*)`
 const SETTLED_MARK = "✅";
 
 /**
- * The group mark when the line is a group header, else null. A mark line whose title opens with
- * an ID ("✅ **SH2** answered") is an item line, as it was before the template existed.
+ * The group mark when the line is a group header, else null. A mark line whose first bold span is
+ * exactly an ID ("✅ **SH2** answered") is an item line, as it was before the template existed;
+ * "🔴 **P0 blockers**" is a group.
  */
 function groupMark(line: string): string | null {
   const m = GROUP_BOLD.exec(line);
   if (!m) return null;
-  const title = stripMarkdown(withoutNewMark(line)).replace(/^\S+\s*/u, "");
-  if (idAt(title) !== null) return null;
+  const open = line.indexOf("**");
+  const close = line.indexOf("**", open + 2);
+  if (close !== -1 && close - open <= MAX_ID_CELL) {
+    const span = stripMarkdown(withoutNewMark(line.slice(open + 2, close))).trim();
+    if (span !== "" && idAt(span) === span) return null;
+  }
   return m[1] ?? m[2] ?? null;
 }
 /** "— 5 items (…)" alone after the Waiting on you heading: a count, not an item. */
 const COUNT_RE = /^[–—-]\s*\d+\s+items?\b(?:\s*\([^)\n]*\))?\s*$/i;
 /** "— 1 item: SH1 approve": the count before the colon is dropped, the item after it kept. */
 const COUNT_PREFIX_RE = /^[–—-]\s*\d+\s+items?\b[^:\n]*:\s*/i;
-/** Marks a group start for parseItems (a private-use character): a fresh list. */
-const GROUP_START = String.fromCharCode(0xe001);
+/**
+ * Markers the section loop puts between lines, out of band (objects, never strings, so no
+ * transcript text can forge one): a group start (a fresh list) and a skip to the next group.
+ */
+interface Marker {
+  mark: "group" | "skip";
+}
+const GROUP_START: Marker = { mark: "group" };
+const SKIP_TO_GROUP: Marker = { mark: "skip" };
+type SectionLine = string | Marker;
 
 /** The text without 🆕 and the whitespace before each one; linear in the text. */
 function withoutNewMark(s: string): string {
@@ -125,7 +142,10 @@ interface TableHead {
 }
 
 function tableHead(cells: string[]): TableHead {
-  const labels = cells.map(stripMarkdown);
+  const labels = cells.map((c) => {
+    const l = stripMarkdown(c.length > MAX_LABEL * 4 ? "" : c);
+    return l.length > MAX_LABEL ? "" : l;
+  });
   return { labels, idCol: labels.findIndex((l) => l.toLowerCase() === "id") };
 }
 
@@ -208,9 +228,9 @@ function indentOf(ws: string): number {
   return ws.replace(/\t/g, "    ").length;
 }
 
-function parseItems(lines: string[]): RawItem[] {
+function parseItems(lines: SectionLine[]): RawItem[] {
   const items: RawItem[] = [];
-  const hasBullets = lines.some((l) => BULLET_RE.test(l));
+  const hasBullets = lines.some((l) => typeof l === "string" && BULLET_RE.test(l));
   let topIndent: number | null = null;
   let lastIsChild = false;
   let lastIndent = 0;
@@ -223,11 +243,11 @@ function parseItems(lines: string[]): RawItem[] {
   const groupHasBullets = new Map<number, boolean>();
   let seen = false;
   for (let i = lines.length - 1; i >= 0; i--) {
-    const l = lines[i] as string;
+    const l = lines[i];
     if (l === GROUP_START) {
       groupHasBullets.set(i, seen);
       seen = false;
-    } else if (BULLET_RE.test(l)) {
+    } else if (typeof l === "string" && BULLET_RE.test(l)) {
       seen = true;
     }
   }
@@ -243,7 +263,11 @@ function parseItems(lines: string[]): RawItem[] {
       groupBullets = groupHasBullets.get(i) ?? false;
       continue;
     }
-    if (skipToGroup) continue;
+    if (line === SKIP_TO_GROUP) {
+      skipToGroup = true;
+      continue;
+    }
+    if (skipToGroup || typeof line !== "string") continue;
     if (line.trim() === "") {
       blankSeen = true;
       continue;
@@ -376,7 +400,7 @@ function toRemaining(raw: RawItem): string {
 }
 
 /** The last section of this kind that has items; empty when none do. */
-function pickItems(sections: string[][] | undefined): RawItem[] {
+function pickItems(sections: SectionLine[][] | undefined): RawItem[] {
   let picked: RawItem[] = [];
   for (const lines of sections ?? []) {
     const items = parseItems(lines);
@@ -394,19 +418,20 @@ export function extractStatus(markdown: string): Status | null {
     const m = PROGRESS_RE.exec(line);
     // The phase ends at the first "**" after its first character (as the old lazy "(.+?)" did) or
     // at the end of the line, without a final ".": found by string search, not by a regex tail.
-    const rest = m?.[2] ?? "";
+    // As on main, at least one character (a space counts) must follow "Phase:".
+    const rest = m?.[3] ?? "";
     const bold = rest.indexOf("**", 1);
     let raw = bold === -1 ? rest.trimEnd() : rest.slice(0, bold);
-    if (raw.endsWith(".")) raw = raw.slice(0, -1);
-    if (m?.[1]) {
+    if (raw.length > 1 && raw.endsWith(".")) raw = raw.slice(0, -1);
+    if (m?.[1] && (m[2] ?? "") + rest !== "") {
       progressPct = Math.min(100, Math.max(0, Math.round(Number(m[1]))));
       phase = stripMarkdown(raw);
       break;
     }
   }
 
-  const sections: Record<Kind, string[][]> = { remaining: [], waiting: [] };
-  let current: string[] | null = null;
+  const sections: Record<Kind, SectionLine[][]> = { remaining: [], waiting: [] };
+  let current: SectionLine[] | null = null;
   let kind: Kind | null = null;
   // The standard Waiting on you template: group headers, tables with the ID in a cell, and a
   // settled group that holds no open items. Tables are read only inside a group; outside one,
@@ -419,17 +444,22 @@ export function extractStatus(markdown: string): Status | null {
   let pending: { cells: string[]; indent: number; at: number } | null = null;
   /** Lines read as table rows or settled items: never recommendations. */
   const consumed = new Set<number>();
+  /** Rows kept from the current table; more than MAX_TABLE_ROWS are read but not kept. */
+  let tableRows = 0;
   const addRow = (cells: string[], h: TableHead | null, indent: number, at: number) => {
     const row = rowItem(cells, h);
     if (row === null) return;
     consumed.add(at);
-    (current as string[] | null)?.push(`${" ".repeat(indent)}- ${row.line}`);
+    if (tableRows >= MAX_TABLE_ROWS) return;
+    tableRows++;
+    (current as SectionLine[] | null)?.push(`${" ".repeat(indent)}- ${row.line}`);
   };
   /** A table ended: its first row, if no separator followed it, is a row too. */
   const closeTable = () => {
     const p = pending;
     pending = null;
     head = null;
+    tableRows = 0;
     if (p !== null) addRow(p.cells, null, p.indent, p.at);
   };
   lines.forEach((line, at) => {
@@ -462,9 +492,9 @@ export function extractStatus(markdown: string): Status | null {
         settledBlank && line === line.trimStart() && !BULLET_RE.test(line) && !TABLE_ROW.test(line);
       settledBlank = false;
       if (paragraph) {
+        // Text after the settled list: the open list ends here, but a later group still counts.
         settled = false;
-        current = null;
-        kind = null;
+        (current as SectionLine[] | null)?.push(SKIP_TO_GROUP);
         return;
       }
       if (!ANY_HEADING.test(line) && !THEMATIC_BREAK.test(line)) {
@@ -494,6 +524,7 @@ export function extractStatus(markdown: string): Status | null {
           isSeparator(tableCells(next))
         ) {
           head = null;
+          tableRows = 0;
           pending = { cells, indent, at };
           return;
         }
@@ -511,7 +542,7 @@ export function extractStatus(markdown: string): Status | null {
       settled = mark === SETTLED_MARK;
       settledBlank = false;
       consumed.add(at);
-      if (!settled) (current as string[] | null)?.push(GROUP_START);
+      if (!settled) (current as SectionLine[] | null)?.push(GROUP_START);
       return;
     }
     if (ANY_HEADING.test(line) || THEMATIC_BREAK.test(line) || TABLE_ROW.test(line)) {
@@ -519,7 +550,7 @@ export function extractStatus(markdown: string): Status | null {
       kind = null;
       return;
     }
-    (current as string[] | null)?.push(line);
+    (current as SectionLine[] | null)?.push(line);
   });
   closeTable();
 
