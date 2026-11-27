@@ -8,7 +8,7 @@ Body text.
 **Waiting on you** — 5 items (🔴 1 urgent · 🆕 2 new)
 
 🔴 **Urgent: blocks work today**
-- **SH83 · Type in the test tab** 🆕
+- **XY83 · Type in the test tab** 🆕
   What: type any line in the test tab.
   I recommend: **yes**, because it proves the hook.
   Reply: `ok` · where: test tab
@@ -21,10 +21,10 @@ Body text.
 🟢 **Here (type the reply)**
 | ID | What it is | I recommend | Reply |
 |---|---|---|---|
-| **SH85** 🆕 | Publish the report | Yes | `SH85 yes` |
-| SH86 | Keep the old flag | No, because unused | `SH86 no` |
+| **XY85** 🆕 | Publish the report | Yes | `XY85 yes` |
+| XY86 | Keep the old flag | No, because unused | `XY86 no` |
 
 ⚪ **Can wait (not blocking)**
 - KIT-Q12 · Upgrade the kit · waits on 2026-12-01
 
-✅ **Settled since last reply:** SH80 → yes, SH82 → run the eval
+✅ **Settled since last reply:** XY80 → yes, XY82 → later

@@ -323,7 +323,7 @@ describe("the standard Waiting on you template (grouped, with tables)", () => {
     expect(s?.remaining).toEqual(["Rebuild (running now)."]);
     expect(s?.waiting).toEqual([
       {
-        id: "SH83",
+        id: "XY83",
         text: "Type in the test tab What: type any line in the test tab. I recommend: yes, because it proves the hook. Reply: ok · where: test tab",
         isNew: true,
         children: [],
@@ -335,14 +335,14 @@ describe("the standard Waiting on you template (grouped, with tables)", () => {
         children: [],
       },
       {
-        id: "SH85",
-        text: "Publish the report · I recommend: Yes · Reply: SH85 yes",
+        id: "XY85",
+        text: "Publish the report · I recommend: Yes · Reply: XY85 yes",
         isNew: true,
         children: [],
       },
       {
-        id: "SH86",
-        text: "Keep the old flag · I recommend: No, because unused · Reply: SH86 no",
+        id: "XY86",
+        text: "Keep the old flag · I recommend: No, because unused · Reply: XY86 no",
         isNew: false,
         children: [],
       },
@@ -413,11 +413,11 @@ describe("the standard template: review fixes", () => {
 
   test("🆕 inside the bold keeps the ID, in a bullet and in a table cell", () => {
     const s = extractStatus(
-      "### Waiting on you\n🔴 **Urgent**\n- **SH84 🆕** do x\n\n🟢 **Here**\n| ID | What it is |\n|---|---|\n| **SH85 🆕** | Publish |\n",
+      "### Waiting on you\n🔴 **Urgent**\n- **XY84 🆕** do x\n\n🟢 **Here**\n| ID | What it is |\n|---|---|\n| **XY85 🆕** | Publish |\n",
     );
     expect(s?.waiting).toEqual([
-      { id: "SH84", text: "do x", isNew: true, children: [] },
-      { id: "SH85", text: "Publish", isNew: true, children: [] },
+      { id: "XY84", text: "do x", isNew: true, children: [] },
+      { id: "XY85", text: "Publish", isNew: true, children: [] },
     ]);
   });
 
