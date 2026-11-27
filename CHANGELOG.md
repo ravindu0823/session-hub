@@ -14,6 +14,10 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
 - `hub mail hook`: a `SessionStart` / `UserPromptSubmit` hook command that names a live session's open mail (ids,
   kinds and sender roles, never the text) as one line of context, so mail no longer waits until the session polls.
   Silent with no mail and on every problem; changes nothing. (#38)
+- A grouped *Waiting on you* section is read in full: group headers (🔴 🟡 🟢 ⚪) and the count after the heading are
+  skipped, table rows become items (the ID cell names the item), 🆕 marks a new item and the ✅ settled group is left
+  out. Plain lists parse as before, except that 🆕 now marks an item new (and is dropped from its text) and a `·`
+  after an ID is a separator like `-`. Status lines ending in `\r` or a line separator no longer slow the parser. (#41)
 
 - Role catalogue in `roles.json`: optional `folder`, `brief`, `model`, `effort`, `gateway`, `mcpServers`, `plugins`,
   `telegramChats` and a unique `questionPrefix` per role, plus `reservedPrefixes`, checked by the parser and returned

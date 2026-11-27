@@ -142,8 +142,11 @@ describe("extractStatus", () => {
     expect(s?.waiting).toEqual([{ id: "Q1", text: "approve x", isNew: false, children: [] }]);
     const t = extractStatus("### Waiting on you\n- Q1 approve x\n---\n- Q2 no\n");
     expect(t?.waiting).toHaveLength(1);
-    const u = extractStatus("### Waiting on you\n- Q1 approve x\n| a | b |\n|---|---|\n");
-    expect(u?.waiting[0]?.text).toBe("approve x");
+    // Outside a template group, a table whose rows hold no ID ends the section, as before.
+    const u = extractStatus(
+      "### Waiting on you\n- Q1 approve x\n| a | b |\n|---|---|\n| c | d |\n- Q2 no\n",
+    );
+    expect(u?.waiting).toEqual([{ id: "Q1", text: "approve x", isNew: false, children: [] }]);
   });
 
   test("indented continuation after a blank line still joins", () => {
@@ -310,5 +313,509 @@ describe("extractStatus", () => {
       ["AUTH-Q3-Q1", "not ascending"],
       ["AUTH-Q1-XQ3", "other stem"],
     ]);
+  });
+});
+
+describe("the standard Waiting on you template (grouped, with tables)", () => {
+  test("every group is read: bullets, table rows with the ID in any cell, new marks", async () => {
+    const s = extractStatus(await fx("waiting-template.md"));
+    expect(s?.progressPct).toBe(60);
+    expect(s?.remaining).toEqual(["Rebuild (running now)."]);
+    expect(s?.waiting).toEqual([
+      {
+        id: "XY83",
+        text: "Type in the test tab What: type any line in the test tab. I recommend: yes, because it proves the hook. Reply: ok · where: test tab",
+        isNew: true,
+        children: [],
+      },
+      {
+        id: "AUTH-Q4",
+        text: "Rotate the API key · Tab: api · I recommend: Rotate now",
+        isNew: false,
+        children: [],
+      },
+      {
+        id: "XY85",
+        text: "Publish the report · I recommend: Yes · Reply: XY85 yes",
+        isNew: true,
+        children: [],
+      },
+      {
+        id: "XY86",
+        text: "Keep the old flag · I recommend: No, because unused · Reply: XY86 no",
+        isNew: false,
+        children: [],
+      },
+      { id: "KIT-Q12", text: "Upgrade the kit · waits on 2026-12-01", isNew: false, children: [] },
+    ]);
+  });
+
+  test("the count after the heading is not an item; nothing still means none", () => {
+    const s = extractStatus("**Waiting on you** — 1 item (🔴 0 urgent · 🆕 1 new)\n\n- SH1 · a\n");
+    expect(s?.waiting.map((w) => w.id)).toEqual(["SH1"]);
+    expect(extractStatus("**Waiting on you:** nothing.\n")?.waiting).toEqual([]);
+  });
+
+  test("settled items are not open, also as bullets under the settled header", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n- SH1 · a\n\n✅ **Settled since last reply:**\n- SH2 → yes\n",
+    );
+    expect(s?.waiting.map((w) => w.id)).toEqual(["SH1"]);
+  });
+
+  test("outside a group any table ends the section, as before; in a group rows are items", () => {
+    const s = extractStatus("### Waiting on you\n| SH1 | approve x |\n| nothing to do | here |\n");
+    expect(s?.waiting).toEqual([]);
+    const g = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| SH1 | approve x |\n| nothing to do | here |\n",
+    );
+    expect(g?.waiting).toEqual([
+      { id: "SH1", text: "approve x", isNew: false, children: [] },
+      { id: null, text: "nothing to do · here", isNew: false, children: [] },
+    ]);
+  });
+
+  test("tables still end the What's remaining section, and table rows are not recommendations", () => {
+    const s = extractStatus(
+      "### What's remaining\n- a\n| x | y |\n- b\n\n### Waiting on you\n🟢 **Here**\n| ID | I recommend |\n|---|---|\n| SH1 | yes |\n",
+    );
+    expect(s?.remaining).toEqual(["a"]);
+    expect(s?.recommendations).toEqual([]);
+  });
+
+  test("a pipe inside a code span does not split a cell", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| ID | Reply |\n|---|---|\n| SH1 | `a | b` |\n",
+    );
+    expect(s?.waiting[0]?.text).toBe("Reply: a | b");
+  });
+});
+
+describe("the standard template: review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+  const timed = (md: string) => {
+    const t0 = performance.now();
+    const s = extractStatus(md);
+    return { s, ms: performance.now() - t0 };
+  };
+
+  test("an indented ✅ line or a ✅ item in a plain list is not the settled group", () => {
+    expect(
+      ids("**Waiting on you:**\n- SH5 approve release\n  ✅ tests pass\n- SH6 rotate key\n"),
+    ).toEqual(["SH5", "SH6"]);
+    expect(ids("### Waiting on you\nSH1 approve\n✅ SH2 done\n")).toEqual(["SH1"]);
+    expect(ids("### Waiting on you\n- SH1 a\n- ✅ SH2 done\n- SH3 c\n")).toEqual([
+      "SH1",
+      null,
+      "SH3",
+    ]);
+  });
+
+  test("🆕 inside the bold keeps the ID, in a bullet and in a table cell", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🔴 **Urgent**\n- **XY84 🆕** do x\n\n🟢 **Here**\n| ID | What it is |\n|---|---|\n| **XY85 🆕** | Publish |\n",
+    );
+    expect(s?.waiting).toEqual([
+      { id: "XY84", text: "do x", isNew: true, children: [] },
+      { id: "XY85", text: "Publish", isNew: true, children: [] },
+    ]);
+  });
+
+  test("nothing, then a table that is not about waiting: still nothing", () => {
+    const s = extractStatus(
+      "**Waiting on you:** nothing.\n\n| Step | Status |\n|---|---|\n| build | done |\n",
+    );
+    expect(s?.waiting).toEqual([]);
+  });
+
+  test("an indented options table under an item becomes that item's children", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n- SH1 pick a plan\n  | Plan | Cost |\n  |---|---|\n  | A | 5 |\n  | B | 9 |\n- SH2 b\n",
+    );
+    expect(s?.waiting).toEqual([
+      {
+        id: "SH1",
+        text: "pick a plan",
+        isNew: false,
+        children: ["Plan: A · Cost: 5", "Plan: B · Cost: 9"],
+      },
+      { id: "SH2", text: "b", isNew: false, children: [] },
+    ]);
+  });
+
+  test("hostile rows: empty, ID only, unclosed backtick, escaped trailing pipe", () => {
+    // A plain string: Bun escapes non-ASCII in String.raw templates, which would change the input.
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| | |\n|\n| SH1 |\n| SH2 | `a | b |\n| SH3 | x \\| y \\|\n",
+    );
+    expect(s?.waiting).toEqual([
+      { id: "SH1", text: "SH1", isNew: false, children: [] },
+      { id: "SH2", text: "`a | b", isNew: false, children: [] },
+      { id: "SH3", text: "x | y |", isNew: false, children: [] },
+    ]);
+  });
+
+  test("huge rows and whitespace runs stay linear", () => {
+    const wide = `### Waiting on you\n🟢 **Here**\n|${" SH1 |".repeat(1)}${" x |".repeat(10_000)}\n`;
+    expect(timed(wide).ms).toBeLessThan(1_000);
+    const big = `### Waiting on you\n🟢 **Here**\n| SH1 | ${"a".repeat(1_000_000)} |\n`;
+    expect(timed(big).ms).toBeLessThan(1_000);
+    const spaces = `### Waiting on you\n- SH1 a\n${" ".repeat(100_000)}x\n${" ".repeat(100_000)}\n`;
+    expect(timed(spaces).ms).toBeLessThan(1_000);
+    const cell = `### Waiting on you\n🟢 **Here**\n| SH1 🆕${" ".repeat(100_000)}🆕 | b${" ".repeat(100_000)}🆕x |\n`;
+    expect(timed(cell).ms).toBeLessThan(1_000);
+  });
+
+  test("a lead-in line in a later group is dropped, and later groups are kept", () => {
+    expect(
+      ids(
+        "### Waiting on you\n🔴 **Urgent**\n- SH1 a\n\n🟢 **Here**\nType one reply per line:\n- SH2 b\n",
+      ),
+    ).toEqual(["SH1", "SH2"]);
+    expect(
+      ids("### Waiting on you\n🔴 **Urgent**\n- SH1 a\n🟢 **Here**\nlead-in\n- SH2 b\n"),
+    ).toEqual(["SH1", "SH2"]);
+    expect(
+      extractStatus("### Waiting on you\n🔴 **Urgent**\n- SH1 a\n🟢 **Here**\nlead-in\n- SH2 b\n")
+        ?.waiting[0]?.text,
+    ).toBe("a");
+  });
+
+  test("only a bare count after the heading is dropped; the hash heading may carry a count", () => {
+    expect(ids("**Waiting on you** — 1 item: SH1 approve deploy\n")).toEqual(["SH1"]);
+    expect(ids("**Waiting on you** — 2 items (🔴 1 urgent)\n- SH1 a\n- SH2 b\n")).toEqual([
+      "SH1",
+      "SH2",
+    ]);
+    expect(ids("## Waiting on you — 5 items\n- SH1 a\n")).toEqual(["SH1"]);
+  });
+
+  test("a group mark in a markdown heading is a heading: it ends the section", () => {
+    expect(ids("### Waiting on you\n- SH0 z\n#### 🔴 Urgent\n- SH1 a\n")).toEqual(["SH0"]);
+  });
+
+  test("the ID column wins over another cell that looks like an ID", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| When | ID | What it is |\n|---|---|---|\n| Q4 | SH9 | Do it |\n",
+    );
+    expect(s?.waiting[0]?.id).toBe("SH9");
+  });
+
+  test("rows outside a waiting section still give recommendations", () => {
+    const s = extractStatus(
+      "| Plan | Note |\n|---|---|\n| A | (recommended) |\n\n**Waiting on you:** nothing.\n",
+    );
+    expect(s?.recommendations.length).toBe(1);
+  });
+});
+
+describe("the standard template: second review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+  const timed = (md: string) => {
+    const t0 = performance.now();
+    extractStatus(md);
+    return performance.now() - t0;
+  };
+
+  test("an indented bold group mark under an item is never a group header", () => {
+    expect(ids("### Waiting on you\n- SH5 a\n  ✅ **tests pass**\n- SH6 b\n")).toEqual([
+      "SH5",
+      "SH6",
+    ]);
+    const s = extractStatus(
+      "### Waiting on you\n- SH5 a\n  🔴 **careful**\n  more text\n- SH6 b\n",
+    );
+    expect(s?.waiting.map((w) => w.id)).toEqual(["SH5", "SH6"]);
+    expect(s?.waiting[0]?.text).toBe("a 🔴 careful more text");
+  });
+
+  test("nothing, then a table with an ID column: still nothing", () => {
+    expect(
+      extractStatus("**Waiting on you:** nothing.\n\n| ID | State |\n|---|---|\n| SH1 | fixed |\n")
+        ?.waiting,
+    ).toEqual([]);
+  });
+
+  test("a header-only table outside a group ends the section", () => {
+    expect(ids("### Waiting on you\n- Q1 approve x\n| a | b |\n|---|---|\n- Q2 no\n")).toEqual([
+      "Q1",
+    ]);
+  });
+
+  test("a count with a colon keeps the item after it", () => {
+    const s = extractStatus("**Waiting on you** — 1 item: SH1 approve deploy\n");
+    expect(s?.waiting).toEqual([{ id: "SH1", text: "approve deploy", isNew: false, children: [] }]);
+  });
+
+  test("a big header with many rows stays linear", () => {
+    const head = `|${" h |".repeat(10_000)}\n|${"---|".repeat(10_000)}\n`;
+    const rows = "| SH1 | x |\n".repeat(10_000);
+    expect(timed(`### Waiting on you\n🟢 **Here**\n${head}${rows}`)).toBeLessThan(1_000);
+  });
+
+  test("a plain ID line in a group is an item, a plain lead-in is not", () => {
+    expect(
+      ids(
+        "### Waiting on you\n🔴 **Urgent**\n- SH1 a\n\n⚪ **Can wait**\nKIT-Q12 upgrade the kit\n",
+      ),
+    ).toEqual(["SH1", "KIT-Q12"]);
+  });
+
+  test("a second separator inside a table body keeps the headers", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| ID | Reply |\n|---|---|\n| SH1 | a |\n|---|---|\n| SH2 | b |\n",
+    );
+    expect(s?.waiting.map((w) => w.text)).toEqual(["Reply: a", "Reply: b"]);
+  });
+
+  test("settled table rows are not recommendations", () => {
+    const s = extractStatus(
+      "### Waiting on you\n✅ **Settled**\n| ID | I recommend |\n|---|---|\n| SH1 | yes |\n",
+    );
+    expect(s?.recommendations).toEqual([]);
+  });
+
+  test("a level-2 heading with a group mark ends the section", () => {
+    expect(ids("### Waiting on you\n- SH1 a\n## 🟢 Next steps\n- SH2 b\n")).toEqual(["SH1"]);
+  });
+
+  test("a tab-indented table under an item is that item's children", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n- SH1 pick\n\t| Plan |\n\t|---|\n\t| A |\n",
+    );
+    expect(s?.waiting[0]?.children).toEqual(["Plan: A"]);
+  });
+
+  test("a long run of spaces after the phase stays linear", () => {
+    const md = `**Progress: about 5% overall. Phase: x${" ".repeat(100_000)}y\n`;
+    expect(timed(md)).toBeLessThan(1_000);
+    expect(extractStatus("**Progress: about 5% overall. Phase: release gate.**\n")?.phase).toBe(
+      "release gate",
+    );
+  });
+});
+
+describe("the standard template: third review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+  const timed = (md: string) => {
+    const t0 = performance.now();
+    extractStatus(md);
+    return performance.now() - t0;
+  };
+
+  test("nothing written as a line or a bullet, then an ID table: still nothing", () => {
+    const table = "\n\n| ID | State |\n|---|---|\n| SH1 | fixed |\n";
+    expect(extractStatus(`### Waiting on you\nnothing.${table}`)?.waiting).toEqual([]);
+    expect(extractStatus(`**Waiting on you:**\n- nothing${table}`)?.waiting).toEqual([]);
+  });
+
+  test("a plain list, then a separate table with ID rows outside a group: only the list", () => {
+    expect(
+      ids("**Waiting on you:**\n- Q1 approve\n\n| ID | State |\n|---|---|\n| Q0 | answered |\n"),
+    ).toEqual(["Q1"]);
+  });
+
+  test("a phase that opens with bold still parses, as before", () => {
+    const s = extractStatus("**Progress: about 50% overall. Phase: **release gate**.\n");
+    expect(s?.progressPct).toBe(50);
+    expect(s?.phase).not.toBeNull();
+  });
+
+  test("groups of plain ID lines (no bullets, no tables) give one item each", () => {
+    expect(
+      ids("**Waiting on you**\n🔴 **Urgent**\nSH1 approve deploy\n\n🟢 **Here**\nSH2 publish\n"),
+    ).toEqual(["SH1", "SH2"]);
+  });
+
+  test("whitespace runs before a \r or a line separator stay linear", () => {
+    const pad = " ".repeat(100_000);
+    for (const end of ["\r", " "]) {
+      expect(timed(`**Progress: about 5% overall. Phase:${pad}x${end}\n`)).toBeLessThan(1_000);
+      expect(timed(`**Waiting on you:**${pad}x${end}\n`)).toBeLessThan(1_000);
+      expect(timed(`### Waiting on you\n- ${pad}x${end}\n`)).toBeLessThan(1_000);
+    }
+    expect(extractStatus("**Progress: about 5% overall. Phase: release gate.**\r\n")?.phase).toBe(
+      "release gate",
+    );
+  });
+
+  test("a table as the very last line, in a group, with no newline", () => {
+    expect(ids("### Waiting on you\n🟢 **Here**\n| SH1 | x |")).toEqual(["SH1"]);
+  });
+
+  test("lines in the settled group are never recommendations", () => {
+    const s = extractStatus("### Waiting on you\n✅ **Settled**\n- SH1 → yes (recommended)\n");
+    expect(s?.recommendations).toEqual([]);
+  });
+});
+
+describe("the standard template: final review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+
+  test("a note paragraph between groups does not end the section", () => {
+    expect(
+      ids(
+        "### Waiting on you\n🔴 **Urgent**\n- SH1 a\n\nThis blocks the release.\n\n🟡 **Later**\n- SH2 b\n",
+      ),
+    ).toEqual(["SH1", "SH2"]);
+    expect(
+      ids(
+        "### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n| SH1 | a |\n\nNote.\n\n⚪ **Can wait**\n- SH2 b\n",
+      ),
+    ).toEqual(["SH1", "SH2"]);
+  });
+
+  test("two plain ID lines in one group, split by a blank line: two items", () => {
+    expect(ids("**Waiting on you**\n🔴 **Urgent**\nSH1 approve\n\nSH2 pick\n")).toEqual([
+      "SH1",
+      "SH2",
+    ]);
+  });
+
+  test("a mark line whose bold text is an ID is an item line, as on main", () => {
+    expect(ids("### Waiting on you\n- SH1 a\n✅ **SH2** answered\n- SH3 c\n")).toEqual([
+      "SH1",
+      "SH3",
+    ]);
+    expect(ids("### Waiting on you\n🔴 **SH1** approve deploy\n🟡 **SH2** pick date\n")).toEqual([
+      null,
+    ]);
+  });
+
+  test("the settled group ends at a paragraph after a blank line", () => {
+    const s = extractStatus(
+      "### Waiting on you\n✅ **Settled**\n- SH0 yes\n\nI recommend shipping today.\n",
+    );
+    expect(s?.waiting).toEqual([]);
+    expect(s?.recommendations).toEqual(["I recommend shipping today."]);
+  });
+
+  test("a group of one plain line with no ID, after a table group, is kept", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n| SH1 | a |\n\n🟡 **Later**\nDecide the release date.\n",
+    );
+    expect(s?.waiting.map((w) => w.text)).toEqual(["a", "Decide the release date."]);
+  });
+
+  test("a second table right under the first in a group starts a new header", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n| SH1 | a |\n| ID | Reply |\n|---|---|\n| SH2 | b |\n",
+    );
+    expect(s?.waiting.map((w) => [w.id, w.text])).toEqual([
+      ["SH1", "a"],
+      ["SH2", "Reply: b"],
+    ]);
+  });
+
+  test("an open group's title is not a recommendation", () => {
+    expect(
+      extractStatus("### Waiting on you\n🟢 **Recommended next**\n- SH1 a\n")?.recommendations,
+    ).toEqual([]);
+  });
+
+  test("a whitespace-only phase still gives the progress, as on main", () => {
+    expect(extractStatus("**Progress: about 50% overall. Phase:  \n")?.progressPct).toBe(50);
+  });
+});
+
+describe("the standard template: fifth review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+
+  test("a long header label times many rows stays bounded", () => {
+    const md = `### Waiting on you\n🟢 **Here**\n| ${"A".repeat(100_000)} |\n|---|\n${"| x |\n".repeat(10_000)}`;
+    const t0 = performance.now();
+    const s = extractStatus(md);
+    expect(performance.now() - t0).toBeLessThan(1_000);
+    const total = (s?.waiting ?? []).reduce((n, w) => n + w.text.length, 0);
+    expect(total).toBeLessThan(200_000);
+  });
+
+  test("a line ending at Phase: is not progress, as on main; Phase: . gives '.'", () => {
+    const s = extractStatus(
+      "**Progress: about 10% overall. Phase:\n**Progress: about 60% overall. Phase: build.**\n",
+    );
+    expect(s?.progressPct).toBe(60);
+    expect(extractStatus("**Progress: about 50% overall. Phase: .\n")?.phase).toBe(".");
+  });
+
+  test("a group title that only opens with an ID-like word is still a group", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🔴 **P0 blockers**\n| ID | What |\n|---|---|\n| SH1 | a |\n",
+    );
+    expect(s?.waiting.map((w) => w.id)).toEqual(["SH1"]);
+    expect(ids("### Waiting on you\n🔴**SH2** approve\n- SH3 c\n")).toEqual(["SH3"]);
+    expect(ids("### Waiting on you\n- SH1 a\n🔴 **🆕 SH2** x\n- SH3 c\n")).toEqual(["SH1", "SH3"]);
+  });
+
+  test("after the settled group and a note, a later open group is kept", () => {
+    expect(
+      ids("### Waiting on you\n✅ **Settled**\n- SH0\n\nNote.\n\n🔴 **Urgent**\n- SH1\n"),
+    ).toEqual(["SH1"]);
+  });
+
+  test("a line that is exactly the private-use marker character changes nothing", () => {
+    const mark = String.fromCharCode(0xe001);
+    expect(ids(`### Waiting on you\n- SH1 a\n\n${mark}\nSH2 b\n`)).toEqual(["SH1"]);
+  });
+});
+
+describe("the standard template: sixth review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+
+  test("an ID-led line with a mark is an item, never a group that hides the next items", () => {
+    expect(ids("### Waiting on you\n- SH1 a\n**✅ SH2** answered\n- SH3 open\n")).toEqual([
+      "SH1",
+      "SH3",
+    ]);
+    expect(ids("### Waiting on you\n- SH1 a\n✅ **SH2 · answered**\n- SH3 open\n")).toEqual([
+      "SH1",
+      "SH3",
+    ]);
+    expect(ids("### Waiting on you\n- SH1 a\n✅ **SH2 answered yes**\n- SH3 open\n")).toEqual([
+      "SH1",
+      "SH3",
+    ]);
+    expect(
+      ids(`### Waiting on you\n- SH1 a\n✅ **SH2 answered ${"y".repeat(80)}**\n- SH3 open\n`),
+    ).toEqual(["SH1", "SH3"]);
+    expect(
+      ids("**Waiting on you**\n🔴 **SH2 · Approve the deploy**\n🟡 **SH3 · Review**\n"),
+    ).toEqual([null]);
+    expect(ids("### Waiting on you\n🔴 **P0 blockers**\n- SH1 a\n")).toEqual(["SH1"]);
+    expect(
+      ids("### Waiting on you\n✅ **Settled since last reply:** SH0 → yes\n- SH1 x\n"),
+    ).toEqual([]);
+  });
+
+  test("a table keeps at most 200 rows; the rest are neither items nor recommendations", () => {
+    const rows = Array.from({ length: 201 }, (_, i) => `| SH${i + 1} | recommend x |`).join("\n");
+    const s = extractStatus(`### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n${rows}\n`);
+    expect(s?.waiting).toHaveLength(200);
+    expect(s?.waiting.at(-1)?.id).toBe("SH200");
+    expect(s?.recommendations.join(" ")).not.toContain("SH201");
+  });
+
+  test("the row count starts again at each new table, in both header paths", () => {
+    const many = (from: number) =>
+      Array.from({ length: 200 }, (_, i) => `| SH${from + i} | x |`).join("\n");
+    const a = extractStatus(
+      `### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n${many(1)}\n| ID | Other |\n|---|---|\n| SH900 | b |\n`,
+    );
+    expect(a?.waiting.at(-1)?.id).toBe("SH900");
+    const b = extractStatus(
+      `### Waiting on you\n🟢 **Here**\n${many(1)}\n| ID | What |\n|---|---|\n| SH900 | b |\n`,
+    );
+    expect(b?.waiting.at(-1)?.id).toBe("SH900");
+  });
+
+  test("Phase: followed only by a line terminator is not progress, as on main", () => {
+    expect(
+      extractStatus("**Progress: about 10% overall. Phase:\r")?.progressPct ?? null,
+    ).toBeNull();
+    expect(
+      extractStatus(`**Progress: about 10% overall. Phase:${String.fromCharCode(0x2028)}`)
+        ?.progressPct ?? null,
+    ).toBeNull();
+    expect(extractStatus("**Progress: about 10% overall. Phase: x\r")?.phase).toBe("x");
   });
 });
