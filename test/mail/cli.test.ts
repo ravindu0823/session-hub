@@ -982,7 +982,7 @@ describe("hub mail statusline", () => {
     expect((await run("mail", ["statusline"], {})).out).toEqual(["✉ 7"]);
   });
 
-  test("the session id comes only from the status-line input, never the body", async () => {
+  test("the session id comes only from the input, never the environment; no body is printed", async () => {
     rawMail();
     statusInput("s-beta");
     const r = await run("mail", ["statusline"], ALPHA);
@@ -1034,13 +1034,34 @@ describe("hub mail statusline", () => {
         (raw.query("PRAGMA data_version").get() as { data_version: number }).data_version;
       const before = version();
       statusInput("s-beta");
-      expect((await run("mail", ["statusline"], {})).out).toEqual(["✉ 1"]);
+      // The production open: no migration, so no transaction.
+      const prod = { openStore: () => Store.open(dbPath, { create: false, migrate: false }) };
+      expect((await run("mail", ["statusline"], {}, prod)).out).toEqual(["✉ 1"]);
       expect(version()).toBe(before);
       rawMail(); // the check sees a write by another connection
       expect(version()).not.toBe(before);
     } finally {
       raw.close();
     }
+  });
+
+  test("an older index: one stderr line naming the error class", async () => {
+    const old = join(dir, "old.db");
+    const raw = new Database(old, { create: true, strict: true });
+    raw.run("CREATE TABLE schema_version (version INTEGER NOT NULL)");
+    for (const m of MIGRATIONS.slice(0, 5)) raw.run(m);
+    raw.run("INSERT INTO schema_version (version) VALUES (1), (2), (3), (4), (5)");
+    raw.close();
+    statusInput("s-beta");
+    const r = await run(
+      "mail",
+      ["statusline"],
+      {},
+      {
+        openStore: () => Store.open(old, { create: false, migrate: false }),
+      },
+    );
+    expect(r).toEqual({ code: 0, out: [], err: ["hub mail statusline: skipped (IndexOutdated)"] });
   });
 
   test("extra arguments are a usage error, not a status line", async () => {
