@@ -33,6 +33,63 @@ const ID_RE = /^((?:[A-Z][A-Z0-9]{0,7}-)*[A-Z][A-Z0-9]{0,6}\d)(?=[:\s,\u2013\u20
 const MAX_ID_CHARS = 24;
 const RANGE_RE = /^[\u2013\u2014-]\s*[A-Z][A-Z0-9]{0,7}(?:-[A-Z][A-Z0-9]{0,7})*\d/;
 const RECOMMEND_RE = /recommend|my pick|\(recommended\)/i;
+/** The standard template's "new" mark (🆕). */
+const NEW_MARK = /\u{1F195}/u;
+const NEW_MARK_ALL = /\s*\u{1F195}\s*/gu;
+/** A group header of the standard template: 🔴 🟡 🟢 ⚪ open items, ✅ settled ones. */
+const GROUP_RE = /^\s*(?:\*\*)?\s*(\u{1F534}|\u{1F7E1}|\u{1F7E2}|⚪|✅)/u;
+const SETTLED_MARK = "✅";
+/** "— 5 items (…)" after the Waiting on you heading: a count, not an item. */
+const COUNT_RE = /^[–—-]\s*\d+\s+items?\b/i;
+const isSeparator = (cells: string[]): boolean => cells.every((c) => /^:?-{3,}:?$/.test(c));
+
+/** The cells of a table row; a "|" inside a code span or escaped as "\|" does not split. */
+function tableCells(line: string): string[] {
+  const cells: string[] = [];
+  let cell = "";
+  let inCode = false;
+  const s = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i] as string;
+    if (c === "\\" && s[i + 1] === "|") {
+      cell += "|";
+      i++;
+    } else if (c === "`") {
+      inCode = !inCode;
+      cell += c;
+    } else if (c === "|" && !inCode) {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += c;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+/**
+ * One table row of a Waiting on you section as an item line: the ID cell first (with its 🆕),
+ * then the other cells, each labelled with its column header unless the column is the "What"
+ * one. A row with no ID cell keeps its cells in order.
+ */
+function rowItem(cells: string[], headers: string[] | null): string {
+  const isId = (c: string) => {
+    const plain = stripMarkdown(c.replace(NEW_MARK_ALL, " "));
+    return plain !== "" && idAt(plain) === plain;
+  };
+  const at = cells.findIndex(isId);
+  const parts: { text: string; what: boolean }[] = [];
+  cells.forEach((c, i) => {
+    if (i === at || c === "") return;
+    const h = headers?.[i] ? stripMarkdown(headers[i] as string) : "";
+    const what = h === "" || /^what\b/i.test(h);
+    parts.push({ text: what ? c : `${h}: ${c}`, what });
+  });
+  parts.sort((a, b) => Number(b.what) - Number(a.what));
+  const body = parts.map((p) => p.text).join(" · ");
+  return at === -1 ? body : `${cells[at]} · ${body}`;
+}
 const MAX_RECOMMENDATIONS = 5;
 
 type Kind = "remaining" | "waiting";
@@ -174,7 +231,10 @@ function idAt(text: string): string | null {
 function toWaiting(raw: RawItem): WaitingItem {
   let text = raw.text;
   const nm = NEW_RE.exec(text);
-  const isNew = nm !== null;
+  // The standard template marks a new item with 🆕 anywhere in it.
+  const marked = NEW_MARK.test(text);
+  if (marked) text = text.replace(NEW_MARK_ALL, " ");
+  const isNew = nm !== null || marked;
   if (nm) {
     // "**New: SH9** foo": the opening ** has no closing one in the prefix, keep it for the body.
     const reopen = nm[1] !== "" && nm[2] === "" ? nm[1] : "";
@@ -190,7 +250,7 @@ function toWaiting(raw: RawItem): WaitingItem {
   if (RANGE_RE.test(rest)) return { id, text: full, isNew, children };
   const body = rest
     .replace(/^\s*:\s*/, "")
-    .replace(/^\s*[,\u2013\u2014-]\s+(?=\S)/, "")
+    .replace(/^\s*[,\u00b7\u2013\u2014-]\s+(?=\S)/, "")
     .replace(/^\s+/, "");
   return { id, text: body === "" ? full : body, isNew, children };
 }
@@ -229,27 +289,68 @@ export function extractStatus(markdown: string): Status | null {
 
   const sections: Record<Kind, string[][]> = { remaining: [], waiting: [] };
   let current: string[] | null = null;
+  let kind: Kind | null = null;
+  // The standard Waiting on you template (owner's global reply format): group headers, tables
+  // with the ID in a cell, and a settled group that holds no open items.
+  let settled = false;
+  let headers: string[] | null = null;
+  let pendingRow: string[] | null = null;
+  const flushRow = () => {
+    if (pendingRow !== null && current !== null) current.push(`- ${rowItem(pendingRow, null)}`);
+    pendingRow = null;
+  };
   for (const line of lines) {
     const heading = matchHeading(line);
     if (heading) {
+      flushRow();
       current = [];
+      kind = heading.kind;
+      settled = false;
+      headers = null;
       sections[heading.kind].push(current);
-      if (heading.rest !== "") current.push(`- ${heading.rest}`);
+      const countOnly = heading.kind === "waiting" && COUNT_RE.test(heading.rest);
+      if (heading.rest !== "" && !countOnly) current.push(`- ${heading.rest}`);
       continue;
     }
+    if (current !== null && kind === "waiting" && TABLE_ROW.test(line)) {
+      if (settled) continue;
+      const cells = tableCells(line);
+      if (isSeparator(cells)) {
+        headers = pendingRow;
+        pendingRow = null;
+      } else if (headers !== null) {
+        current.push(`- ${rowItem(cells, headers)}`);
+      } else {
+        flushRow();
+        pendingRow = cells;
+      }
+      continue;
+    }
+    flushRow();
+    headers = null;
     if (ANY_HEADING.test(line) || THEMATIC_BREAK.test(line) || TABLE_ROW.test(line)) {
       current = null;
+      kind = null;
       continue;
+    }
+    if (current !== null && kind === "waiting") {
+      const group = GROUP_RE.exec(line);
+      if (group) {
+        settled = group[1] === SETTLED_MARK;
+        continue;
+      }
+      if (settled) continue;
     }
     current?.push(line);
   }
+  flushRow();
 
   const hasSection = sections.remaining.length > 0 || sections.waiting.length > 0;
   if (progressPct === null && !hasSection) return null;
 
   const recommendations: string[] = [];
   for (const line of lines) {
-    if (!RECOMMEND_RE.test(line)) continue;
+    if (TABLE_ROW.test(line) || !RECOMMEND_RE.test(line)) continue;
     const text = stripMarkdown(line.replace(/^\s*(?:\d+[.)]|[-*\u2022]|#{1,6})\s+/, ""));
     if (text && !recommendations.includes(text)) recommendations.push(text);
     if (recommendations.length >= MAX_RECOMMENDATIONS) break;

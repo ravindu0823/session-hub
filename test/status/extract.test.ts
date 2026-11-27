@@ -312,3 +312,72 @@ describe("extractStatus", () => {
     ]);
   });
 });
+
+describe("the standard Waiting on you template (grouped, with tables)", () => {
+  test("every group is read: bullets, table rows with the ID in any cell, new marks", async () => {
+    const s = extractStatus(await fx("waiting-template.md"));
+    expect(s?.progressPct).toBe(60);
+    expect(s?.remaining).toEqual(["Rebuild (running now)."]);
+    expect(s?.waiting).toEqual([
+      {
+        id: "SH83",
+        text: "Type in the test tab What: type any line in the test tab. I recommend: yes, because it proves the hook. Reply: ok · where: test tab",
+        isNew: true,
+        children: [],
+      },
+      {
+        id: "AUTH-Q4",
+        text: "Rotate the API key · Tab: api · I recommend: Rotate now",
+        isNew: false,
+        children: [],
+      },
+      {
+        id: "SH85",
+        text: "Publish the report · I recommend: Yes · Reply: SH85 yes",
+        isNew: true,
+        children: [],
+      },
+      {
+        id: "SH86",
+        text: "Keep the old flag · I recommend: No, because unused · Reply: SH86 no",
+        isNew: false,
+        children: [],
+      },
+      { id: "KIT-Q12", text: "Upgrade the kit · waits on 2026-12-01", isNew: false, children: [] },
+    ]);
+  });
+
+  test("the count after the heading is not an item; nothing still means none", () => {
+    const s = extractStatus("**Waiting on you** — 1 item (🔴 0 urgent · 🆕 1 new)\n\n- SH1 · a\n");
+    expect(s?.waiting.map((w) => w.id)).toEqual(["SH1"]);
+    expect(extractStatus("**Waiting on you:** nothing.\n")?.waiting).toEqual([]);
+  });
+
+  test("settled items are not open, also as bullets under the settled header", () => {
+    const s = extractStatus(
+      "### Waiting on you\n🟢 **Here**\n- SH1 · a\n\n✅ **Settled since last reply:**\n- SH2 → yes\n",
+    );
+    expect(s?.waiting.map((w) => w.id)).toEqual(["SH1"]);
+  });
+
+  test("a table without a header row, and a row with no ID", () => {
+    const s = extractStatus("### Waiting on you\n| SH1 | approve x |\n| nothing to do | here |\n");
+    expect(s?.waiting).toEqual([
+      { id: "SH1", text: "approve x", isNew: false, children: [] },
+      { id: null, text: "nothing to do · here", isNew: false, children: [] },
+    ]);
+  });
+
+  test("tables still end the What's remaining section, and table rows are not recommendations", () => {
+    const s = extractStatus(
+      "### What's remaining\n- a\n| x | y |\n- b\n\n### Waiting on you\n| ID | I recommend |\n|---|---|\n| SH1 | yes |\n",
+    );
+    expect(s?.remaining).toEqual(["a"]);
+    expect(s?.recommendations).toEqual([]);
+  });
+
+  test("a pipe inside a code span does not split a cell", () => {
+    const s = extractStatus("### Waiting on you\n| ID | Reply |\n|---|---|\n| SH1 | `a | b` |\n");
+    expect(s?.waiting[0]?.text).toBe("Reply: a | b");
+  });
+});
