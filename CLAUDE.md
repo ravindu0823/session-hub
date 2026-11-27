@@ -109,6 +109,8 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   the owner's decision answers), and the `hub mail`, `hub ask` and `hub answer` commands that local sessions and
   the owner run. `hub mail hook` also reads Claude Code's hook input on stdin: only `hook_event_name` and
   `session_id` are used; the rest (a UserPromptSubmit prompt included) is parsed and dropped, never stored or logged.
+  `hub mail statusline` reads Claude Code's status-line input on stdin: only `session_id` is used; the rest is parsed
+  and dropped, never stored or logged.
 
 ## Target architecture
 - Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index and owns its schema; the TUI and the
