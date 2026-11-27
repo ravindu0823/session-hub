@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type MailCliDeps, runMailCli } from "../../src/mail/cli";
+import { sqliteWaiterState } from "../../src/mail/waiter";
 import { type SessionRow, Store } from "../../src/store/db";
 import { MIGRATIONS } from "../../src/store/schema";
 
@@ -1075,23 +1076,9 @@ describe("hub mail wait (asyncRewake doorbell)", () => {
     files.set("-", JSON.stringify({ hook_event_name: event, session_id: sessionId }));
   }
 
-  /** An in-memory WaiterState. */
-  function memWaiter() {
-    const locks = new Set<string>();
-    const rung = new Map<string, number>();
-    return {
-      locks,
-      rung,
-      claim: (s: string) => {
-        if (locks.has(s)) return false;
-        locks.add(s);
-        return true;
-      },
-      release: (s: string) => void locks.delete(s),
-      lastRung: (s: string) => rung.get(s) ?? null,
-      setRung: (s: string, id: number) => void rung.set(s, id),
-    };
-  }
+  /** The real SQLite waiter state in the test folder; each open is a new connection. */
+  const waiterPath = () => join(dir, "run", "waiters", "waiters.db");
+  const openWaiter = () => sqliteWaiterState(waiterPath(), 4242);
 
   let shared: Store | null = null;
   afterEach(() => {
@@ -1112,35 +1099,43 @@ describe("hub mail wait (asyncRewake doorbell)", () => {
     });
   }
 
-  /** Runs `hub mail wait`; `onPoll(n)` runs before the n-th sleep (1-based). */
+  /** Runs `hub mail wait`; `onSleep(n)` runs at the n-th sleep (1-based; sleeps are 1 s steps). */
   async function wait(
-    w: ReturnType<typeof memWaiter>,
-    onPoll: (n: number) => void = () => {},
+    onSleep: (n: number) => unknown = () => {},
     args: string[] = ["wait"],
     over: Partial<MailCliDeps> = {},
-  ): Promise<Run & { polls: number }> {
-    let polls = 0;
+  ): Promise<Run & { sleeps: number }> {
+    let sleeps = 0;
     const r = await run(
       "mail",
       args,
       {},
       {
-        waiter: w,
+        openWaiter,
+        waitPollMs: 1_000,
         sleep: async (ms) => {
           clock += ms;
-          polls++;
-          onPoll(polls);
+          sleeps++;
+          await onSleep(sleeps);
         },
         ...over,
       },
     );
-    return { ...r, polls };
+    return { ...r, sleeps };
   }
 
+  const holder = () => {
+    const raw = new Database(waiterPath(), { readonly: true });
+    try {
+      return raw.query("SELECT * FROM waiter").all();
+    } finally {
+      raw.close();
+    }
+  };
+
   test("rings once, on stderr with exit 2, for mail queued after it started; never the body", async () => {
-    const w = memWaiter();
     hookInput("Stop", "s-beta");
-    const r = await wait(w, (n) => {
+    const r = await wait((n) => {
       if (n === 3) rawMail();
     });
     expect(r.code).toBe(2);
@@ -1152,16 +1147,14 @@ describe("hub mail wait (asyncRewake doorbell)", () => {
     expect(t).toContain("hub mail inbox");
     expect(t).toContain("never approves");
     expect(t).not.toContain("please run");
-    expect(w.rung.get("s-beta")).toBe(1);
-    expect(w.locks.size).toBe(0);
+    expect(holder()).toEqual([]);
     expect(open().mail().get(1)?.state).toBe("queued");
   });
 
   test("mail already queued when the first waiter starts does not ring; newer mail does", async () => {
     rawMail();
-    const w = memWaiter();
     hookInput("SessionStart", "s-beta");
-    const r = await wait(w, (n) => {
+    const r = await wait((n) => {
       if (n === 2) rawMail();
     });
     expect(r.code).toBe(2);
@@ -1170,54 +1163,100 @@ describe("hub mail wait (asyncRewake doorbell)", () => {
   });
 
   test("the same mail never rings twice; a later waiter rings only for newer mail", async () => {
-    const w = memWaiter();
     hookInput("Stop", "s-beta");
-    expect((await wait(w, (n) => n === 1 && rawMail())).code).toBe(2);
-    const again = await wait(w, (n) => n === 4 && rawMail(), ["wait", "--max-minutes", "1"]);
+    await wait(() => {}, ["wait", "--max-minutes", "1"]); // baseline
+    expect((await wait((n) => n === 1 && rawMail())).code).toBe(2);
+    const again = await wait((n) => n === 4 && rawMail(), ["wait", "--max-minutes", "1"]);
     expect(again.code).toBe(2);
     expect(again.err[0]).toContain("M-000002");
     expect(again.err[0]).not.toContain("M-000001");
-    const quiet = await wait(w, () => {}, ["wait", "--max-minutes", "1"]);
-    expect(quiet).toMatchObject({ code: 0, out: [], err: [] });
+    expect(await wait(() => {}, ["wait", "--max-minutes", "1"])).toMatchObject({
+      code: 0,
+      out: [],
+      err: [],
+    });
   });
 
-  test("a second waiter for the same session exits at once", async () => {
-    const w = memWaiter();
-    w.locks.add("s-beta");
+  test("mail requeued after its taker ended rings again for an idle session of the role", async () => {
+    open().upsertSession(session("s-beta2", { name: "beta", profile: "home" }));
     hookInput("Stop", "s-beta");
-    const r = await wait(w, () => rawMail());
-    expect(r).toMatchObject({ code: 0, out: [], err: [], polls: 0 });
-    expect(w.locks.has("s-beta")).toBe(true);
+    await wait(() => {}, ["wait", "--max-minutes", "1"]); // baseline
+    const first = await wait((n) => n === 1 && rawMail(), ["wait", "--max-minutes", "1"]);
+    expect(first.err[0]).toContain("M-000001");
+    const s = shared ?? open();
+    s.mail().claim("beta", "s-beta2", clock);
+    s.upsertSession(session("s-beta2", { name: "beta", profile: "home", endedAt: clock }));
+    expect(
+      s
+        .mail()
+        .requeueEnded()
+        .map((m) => m.id),
+    ).toEqual([1]);
+    const again = await wait(() => {}, ["wait", "--max-minutes", "1"]);
+    expect(again.code).toBe(2);
+    expect(again.err[0]).toContain("M-000001");
   });
 
-  test("gives up silently at the time limit and drops its lock", async () => {
-    const w = memWaiter();
+  test("a second waiter exits at once and extends the running waiter's time limit", async () => {
     hookInput("Stop", "s-beta");
     const t0 = clock;
-    const r = await wait(w, () => {}, ["wait", "--max-minutes", "2"]);
-    expect(r).toMatchObject({ code: 0, out: [], err: [] });
-    expect(clock - t0).toBeGreaterThanOrEqual(120_000);
-    expect(clock - t0).toBeLessThan(130_000);
-    expect(w.locks.size).toBe(0);
+    let second = null as Run | null;
+    const r = await wait(
+      async (n) => {
+        // A Stop while the first waiter runs: it must not start, and must keep the session covered.
+        if (n === 5) second = await run("mail", ["wait", "--max-minutes", "3"], {}, { openWaiter });
+      },
+      ["wait", "--max-minutes", "1"],
+    );
+    expect(second).toEqual({ code: 0, out: [], err: [] });
+    expect(r).toMatchObject({ code: 0, err: [] });
+    expect(clock - t0).toBeGreaterThanOrEqual(3 * 60_000);
+    expect(clock - t0).toBeLessThan(3 * 60_000 + 10_000);
   });
 
-  test("stops when the session ends; mail for other roles, taken mail and acked mail never ring", async () => {
-    const w = memWaiter();
+  test("gives up silently at the time limit and ends its lease", async () => {
     hookInput("Stop", "s-beta");
-    const r = await wait(w, (n) => {
+    const t0 = clock;
+    const r = await wait(() => {}, ["wait", "--max-minutes", "2"]);
+    expect(r).toMatchObject({ code: 0, out: [], err: [] });
+    expect(clock - t0).toBeGreaterThanOrEqual(120_000);
+    expect(clock - t0).toBeLessThan(125_000);
+    expect(holder()).toEqual([]);
+  });
+
+  test("stops when the session ends; mail for other roles and taken mail never ring", async () => {
+    hookInput("Stop", "s-beta");
+    const r = await wait((n) => {
       if (n === 1) rawMail("alpha");
       if (n === 2) {
         rawMail();
         (shared ?? open()).mail().claim("beta", "s-beta", clock);
       }
-      if (n === 3)
+      if (n === 3) {
         open().upsertSession(session("s-beta", { name: "beta", profile: "home", endedAt: clock }));
+      }
     });
-    expect(r).toMatchObject({ code: 0, out: [], err: [], polls: 3 });
+    expect(r).toMatchObject({ code: 0, out: [], err: [], sleeps: 3 });
+  });
+
+  test("a resumed session's old end time does not stop a new waiter; a lasting one does", async () => {
+    open().upsertSession(session("s-beta", { name: "beta", profile: "home", endedAt: clock - 1 }));
+    hookInput("SessionStart", "s-beta");
+    const r = await wait((n) => {
+      if (n === 2) open().upsertSession(session("s-beta", { name: "beta", profile: "home" }));
+      if (n === 4) rawMail();
+    });
+    expect(r.code).toBe(2);
+    expect(r.err[0]).toContain("M-000001");
+    open().upsertSession(session("s-beta", { name: "beta", profile: "home", endedAt: clock - 1 }));
+    const t0 = clock;
+    const gone = await wait();
+    expect(gone).toMatchObject({ code: 0, err: [] });
+    expect(clock - t0).toBeGreaterThanOrEqual(120_000);
+    expect(clock - t0).toBeLessThan(130_000);
   });
 
   test("waits for a new session to be indexed, then rings", async () => {
-    const w = memWaiter();
     hookInput("SessionStart", "s-late");
     roles = JSON.stringify({
       roles: [
@@ -1225,7 +1264,7 @@ describe("hub mail wait (asyncRewake doorbell)", () => {
         { role: "beta", profile: "home", sessions: ["beta", "late"] },
       ],
     });
-    const r = await wait(w, (n) => {
+    const r = await wait((n) => {
       if (n === 2) open().upsertSession(session("s-late", { name: "late", profile: "home" }));
       if (n === 4) rawMail();
     });
@@ -1233,59 +1272,126 @@ describe("hub mail wait (asyncRewake doorbell)", () => {
     expect(r.err[0]).toContain("M-000001");
   });
 
-  test("bad input, other events, no waiter state or a bad limit: exit 0, silent, nothing claimed", async () => {
-    const w = memWaiter();
+  test("an install or a daemon stop under way: the waiter lets go within a second", async () => {
+    hookInput("Stop", "s-beta");
+    let stop = false;
+    const r = await wait(
+      (n) => {
+        if (n === 7) stop = true;
+      },
+      ["wait"],
+      { shouldStop: () => stop, waitPollMs: 5_000 },
+    );
+    expect(r).toMatchObject({ code: 0, out: [], err: [], sleeps: 7 });
+    expect(holder()).toEqual([]);
+  });
+
+  test("bad input, other events or no state: exit 0, silent, no lease", async () => {
     const silent = { code: 0, out: [], err: [] };
     files.set("-", "not json");
-    expect(await wait(w)).toMatchObject(silent);
+    expect(await wait()).toMatchObject(silent);
     hookInput("UserPromptSubmit", "s-beta");
-    expect(await wait(w)).toMatchObject(silent);
+    expect(await wait()).toMatchObject(silent);
     hookInput("Stop", "bad id; rm");
-    expect(await wait(w)).toMatchObject(silent);
+    expect(await wait()).toMatchObject(silent);
     hookInput("Stop", "s-beta");
     expect(await run("mail", ["wait"], {})).toEqual(silent);
+  });
+
+  test("a bad flag exits 0 (exit 2 would start a turn and loop in a Stop hook)", async () => {
+    hookInput("Stop", "s-beta");
     for (const bad of [
       ["--max-minutes", "0"],
       ["--max-minutes", "1441"],
       ["--max-minutes", "x"],
+      ["--max-minutes=60"],
       ["x"],
     ]) {
-      expect((await wait(w, () => {}, ["wait", ...bad])).code).toBe(2);
+      const r = await wait(() => {}, ["wait", ...bad]);
+      expect(r.code).toBe(0);
+      expect(r.out).toEqual([]);
+      expect(r.err).toHaveLength(1);
+      expect(r.err[0]).toStartWith("hub mail wait: skipped (usage:");
     }
-    expect(w.locks.size).toBe(0);
   });
 
-  test("an unexpected failure: one stderr line with the class, exit 0, lock dropped", async () => {
-    const w = memWaiter();
+  test("a lasting failure: one stderr line with the class, exit 0, lease ended", async () => {
     hookInput("Stop", "s-beta");
     roles = "{";
-    const r = await wait(w);
+    const r = await wait();
     expect(r).toMatchObject({
       code: 0,
       out: [],
       err: ["hub mail wait: skipped (RolesConfigError)"],
     });
-    expect(w.locks.size).toBe(0);
+    expect(r.sleeps).toBe(2);
+    expect(holder()).toEqual([]);
   });
 
-  test("the hook moves the bookmark, so mail it already named does not ring later", async () => {
-    const w = memWaiter();
-    rawMail();
-    w.rung.set("s-beta", 0);
-    hookInput("UserPromptSubmit", "s-beta");
-    expect((await run("mail", ["hook"], {}, { waiter: w })).out).toHaveLength(1);
-    expect(w.rung.get("s-beta")).toBe(1);
+  test("a passing failure (roles.json read mid-write) does not end the waiter", async () => {
     hookInput("Stop", "s-beta");
-    expect(await wait(w, () => {}, ["wait", "--max-minutes", "1"])).toMatchObject({
+    const good = roles;
+    roles = "{";
+    const r = await wait((n) => {
+      if (n === 1) roles = good;
+      if (n === 3) rawMail();
+    });
+    expect(r.code).toBe(2);
+    expect(r.err[0]).toContain("M-000001");
+  });
+
+  test("an older index ends the waiter at once", async () => {
+    const old = join(dir, "old.db");
+    const raw = new Database(old, { create: true, strict: true });
+    raw.run("CREATE TABLE schema_version (version INTEGER NOT NULL)");
+    for (const m of MIGRATIONS.slice(0, 5)) raw.run(m);
+    raw.run("INSERT INTO schema_version (version) VALUES (1), (2), (3), (4), (5)");
+    raw.close();
+    hookInput("Stop", "s-beta");
+    const r = await wait(() => {}, ["wait"], {
+      openStore: () => Store.open(old, { create: false, migrate: false }),
+    });
+    expect(r).toMatchObject({
+      code: 0,
+      err: ["hub mail wait: skipped (IndexOutdated)"],
+      sleeps: 0,
+    });
+  });
+
+  test("the hook records what it named, so that mail never rings later", async () => {
+    hookInput("Stop", "s-beta");
+    await wait(() => {}, ["wait", "--max-minutes", "1"]); // baseline
+    rawMail();
+    hookInput("UserPromptSubmit", "s-beta");
+    expect((await run("mail", ["hook"], {}, { openWaiter })).out).toHaveLength(1);
+    hookInput("Stop", "s-beta");
+    expect(await wait(() => {}, ["wait", "--max-minutes", "1"])).toMatchObject({
       code: 0,
       err: [],
     });
   });
 
+  test("a hook whose state cannot be opened still prints its context", async () => {
+    rawMail();
+    hookInput("UserPromptSubmit", "s-beta");
+    const r = await run(
+      "mail",
+      ["hook"],
+      {},
+      {
+        openWaiter: () => {
+          throw new Error("locked");
+        },
+      },
+    );
+    expect(r.out).toHaveLength(1);
+    expect(r.err).toEqual([]);
+  });
+
   test("lists at most 10 new mails, then a count", async () => {
-    const w = memWaiter();
     hookInput("Stop", "s-beta");
-    const r = await wait(w, (n) => {
+    await wait(() => {}, ["wait", "--max-minutes", "1"]); // baseline
+    const r = await wait((n) => {
       if (n === 1) for (let i = 0; i < 12; i++) rawMail();
     });
     expect(r.err[0]).toContain("12 new");

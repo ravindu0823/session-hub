@@ -5,14 +5,14 @@ import { basename, dirname, join } from "node:path";
 import pkg from "../../package.json" with { type: "json" };
 import { readLines } from "../bridge/protocol.ts";
 import { type BridgeDeps, runBridge } from "../bridge/server.ts";
-import { DATA_DIR, PROFILES, RELAY_LOG } from "../config.ts";
+import { DAEMON_STOPPED_FILE, DATA_DIR, PROFILES, RELAY_LOG } from "../config.ts";
 import { identifyDaemon, type LockInfo } from "../daemon/lock.ts";
 import { createLogger } from "../daemon/log.ts";
 import { realClaudeCli } from "../discovery/agents.ts";
 import { runMailCli } from "../mail/cli.ts";
 import { parseRolesConfig, type RolesConfig, rolesLoader } from "../mail/roles.ts";
 import { insideClaudeCode, mailUpkeep, withoutSessionEnv } from "../mail/service.ts";
-import { fileWaiterState, processAlive } from "../mail/waiter.ts";
+import { sqliteWaiterState } from "../mail/waiter.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
 import { claimMarkerFile, runGuard } from "../send/guard.ts";
@@ -328,10 +328,15 @@ export function realCliDeps(opts: {
         readInput: async (p) => (p === "-" ? await Bun.stdin.text() : readFileSync(p, "utf8")),
         sleep: (ms) => Bun.sleep(ms),
         exists: (p) => existsSync(p),
-        waiter: fileWaiterState(join(paths.runDir, "waiters"), {
-          pid: process.pid,
-          alive: processAlive,
-        }),
+        openWaiter: () =>
+          sqliteWaiterState(join(paths.runDir, "waiters", "waiters.db"), process.pid),
+        // An install stages hub.exe.new before its swap, a deliberate daemon stop (install,
+        // uninstall) writes daemon.stopped first, and a purge deletes hub.db: a waiter then exits
+        // and lets go of hub.exe.
+        shouldStop: () =>
+          existsSync(join(paths.runDir, DAEMON_STOPPED_FILE)) ||
+          existsSync(`${paths.installedExe}.new`) ||
+          !existsSync(paths.dbPath),
         // `hub` is not on PATH in every shell a session uses: the hook text names this exe.
         ...(compiled ? { selfCommand: process.execPath } : {}),
       }),

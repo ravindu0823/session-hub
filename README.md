@@ -300,11 +300,14 @@ writes one stderr line with the error class only. It does not wake an idle sessi
 runs it in the background, and its exit code 2 starts a turn in the session, even an idle one, with the command's
 stderr as the text. It waits until mail is queued for the session's role that it has not rung for, then writes one
 doorbell line (it says it is a doorbell, not an error and not an approval, and names only ids, kinds and sender
-roles, never the text) and exits 2. At most one waiter runs per session (a lock in the run folder), the same mail
-never rings twice, and mail that was queued before the session's first waiter or that `hub mail hook` already named
-does not ring. After a turn, the `Stop` hook starts the next waiter. It gives up after `--max-minutes` (default 25,
-at most 1440), when the session ends, or on any problem, always with exit 0 and nothing shown to the session. It
-changes no mail. Add it next to `hub mail hook`, with a `timeout` (seconds) a little longer than the wait:
+roles, never the text) and exits 2. At most one waiter runs per session (a lease with a heartbeat in
+`run\waiters\waiters.db`); a `Stop` while a waiter runs extends that waiter's time limit instead of starting a
+second one. The same mail never rings twice, mail that was queued before the session's first waiter or that
+`hub mail hook` already named does not ring, and mail that goes back to the queue after its session ended rings
+again. It gives up after `--max-minutes` (default 25, at most 1440), when the session ends, during an install or a
+deliberate daemon stop (it lets go of `hub.exe` within a second, so the install can replace it), on a bad flag or
+on a lasting problem, always with exit 0 and nothing shown to the session. It changes no mail. Add it next to
+`hub mail hook`, with a `timeout` (seconds) a little longer than the wait:
 
 ```json
 {
