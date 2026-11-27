@@ -272,16 +272,23 @@ chat that two roles list) under `problems`.
 
 **See mail without polling.** `hub mail hook` is a Claude Code hook command for `SessionStart` and
 `UserPromptSubmit`. It reads the hook input, finds the session's role and, when that role has open mail, adds one
-line of context naming the ids, kinds and sender roles (never the text) and the command that reads them. With no mail
-it prints nothing. It changes nothing, and on any problem it stays silent and exits 0, so it never blocks a prompt.
-It does not wake an idle session: for that, run `hub mail follow` under a monitor. Add it to each profile's
+line of context naming the ids, kinds and sender roles (never the text; a sender that is not a valid role name shows
+as unknown, owner and hub mail as unverified) and the command that reads them. With no mail it prints nothing. A
+SessionStart call waits up to 5 s for the daemon to index the new session; UserPromptSubmit never waits. It changes
+nothing and always exits 0, so it never blocks a prompt; an unexpected failure (an older index, a bad `roles.json`)
+writes one stderr line with the error class only. It does not wake an idle session: for that, run `hub mail follow`
+under a monitor. Install a build that has `hub mail hook` before you add it, then add it to each profile's
 `settings.json` (use the installed path of `hub.exe`):
 
 ```json
 {
   "hooks": {
-    "SessionStart": [{ "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail hook" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail hook" }] }]
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail hook", "timeout": 10 }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "\"C:\\path\\to\\hub.exe\" mail hook", "timeout": 5 }] }
+    ]
   }
 }
 ```
