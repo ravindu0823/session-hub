@@ -56,6 +56,7 @@ const NO_CATALOGUE = {
   plugins: [],
   telegramChats: [],
   questionPrefix: null,
+  guard: null,
 };
 
 describe("parseRolesConfig", () => {
@@ -125,8 +126,49 @@ describe("parseRolesConfig: the role catalogue", () => {
     const cfg = parseRolesConfig(
       JSON.stringify({ roles: [full], reservedPrefixes: ["OLD", "X1"] }),
     );
-    expect(cfg.roles).toEqual([{ ...full, sessions: ["web"] }]);
+    expect(cfg.roles).toEqual([{ ...full, sessions: ["web"], guard: null }]);
     expect(cfg.reservedPrefixes).toEqual(["OLD", "X1"]);
+  });
+
+  test("reads a guard policy; reason has a default", () => {
+    const guard = {
+      denyTools: ["mcp__ops*", "WebFetch"],
+      denyAgents: ["Explore", "ops-*"],
+      writeOnlyUnder: ["C:\\work\\notes"],
+      reason: "coordinator only: delegate",
+    };
+    const cfg = parseRolesConfig(JSON.stringify({ roles: [{ role: "lead", guard }] }));
+    expect(cfg.roles[0]?.guard).toEqual(guard);
+    const bare = parseRolesConfig(JSON.stringify({ roles: [{ role: "lead", guard: {} }] }));
+    expect(bare.roles[0]?.guard).toEqual({
+      denyTools: [],
+      denyAgents: [],
+      writeOnlyUnder: [],
+      reason: "this session's role does not use this tool: delegate it",
+    });
+  });
+
+  test("refuses bad guard policies", () => {
+    const bad: unknown[] = [
+      "x",
+      { denyTools: "Agent" },
+      { denyTools: ["a b"] },
+      { denyTools: ["mcp__(.*)"] },
+      { denyAgents: ["*x"] },
+      { denyTools: Array.from({ length: 51 }, (_, i) => `t${i}`) },
+      { writeOnlyUnder: "C:\\x" },
+      { writeOnlyUnder: ["relative"] },
+      { writeOnlyUnder: Array.from({ length: 11 }, (_, i) => `C:\\f${i}`) },
+      { reason: "" },
+      { reason: "two\nlines" },
+      { reason: "x".repeat(301) },
+      { reason: 5 },
+    ];
+    for (const guard of bad) {
+      expect(() => parseRolesConfig(JSON.stringify({ roles: [{ role: "lead", guard }] }))).toThrow(
+        RolesConfigError,
+      );
+    }
   });
 
   test("accepts model aliases and full model ids, with or without [1m]", () => {

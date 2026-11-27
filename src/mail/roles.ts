@@ -4,6 +4,8 @@
  * session's own name. Role names, profiles and people live only in that local file.
  */
 
+import type { RoleGuard } from "../guard/policy.ts";
+
 /** Lower-case letters, digits, ".", "_" and "-", starting with a letter or digit; 1 to 64 characters. */
 const ROLE_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 
@@ -29,6 +31,10 @@ const PREFIX_RE = /^[A-Z][A-Z0-9]{0,11}$/;
 const NAME_RE = /^[A-Za-z0-9@._:-]{1,64}$/;
 const MAX_NAMES = 50;
 const MAX_PATH_CHARS = 260;
+/** A tool or agent-type name, optionally ending in `*` (a prefix), or `*` alone. */
+const GUARD_NAME_RE = /^(?:[A-Za-z0-9@._:-]{1,100}\*?|\*)$/;
+const MAX_GUARD_FOLDERS = 10;
+const MAX_REASON_CHARS = 300;
 
 export interface RoleEntry {
   role: string;
@@ -52,6 +58,8 @@ export interface RoleEntry {
   telegramChats: string[];
   /** Family prefix of this role's owner-question IDs; unique. */
   questionPrefix: string | null;
+  /** Tool policy `hub guard` applies to this role's sessions; null: none. */
+  guard: RoleGuard | null;
 }
 
 export interface RolesConfig {
@@ -137,6 +145,50 @@ function nameList(v: unknown, role: string, what: string): string[] {
   return v as string[];
 }
 
+function guardNames(v: unknown, role: string, what: string): string[] {
+  if (v === undefined) return [];
+  if (
+    !Array.isArray(v) ||
+    v.length > MAX_NAMES ||
+    !v.every((n) => typeof n === "string" && GUARD_NAME_RE.test(n))
+  ) {
+    throw new RolesConfigError(
+      `"${role}": guard.${what} must be a list of tool or agent names, each optionally ending in *`,
+    );
+  }
+  return v as string[];
+}
+
+/** The role's tool policy for `hub guard`, or null when it has none. */
+function parseGuard(v: unknown, role: string): RoleGuard | null {
+  if (v === undefined) return null;
+  if (!isRecord(v)) throw new RolesConfigError(`"${role}": guard must be an object`);
+  const folders = v.writeOnlyUnder ?? [];
+  if (!Array.isArray(folders) || folders.length > MAX_GUARD_FOLDERS) {
+    throw new RolesConfigError(
+      `"${role}": guard.writeOnlyUnder must be a list of up to 10 folders`,
+    );
+  }
+  const reason = v.reason ?? "this session's role does not use this tool: delegate it";
+  if (
+    typeof reason !== "string" ||
+    reason.trim() === "" ||
+    reason.length > MAX_REASON_CHARS ||
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses
+    /[\u0000-\u001f\u007f]/.test(reason)
+  ) {
+    throw new RolesConfigError(`"${role}": guard.reason must be one line of 1 to 300 characters`);
+  }
+  return {
+    denyTools: guardNames(v.denyTools, role, "denyTools"),
+    denyAgents: guardNames(v.denyAgents, role, "denyAgents"),
+    writeOnlyUnder: folders.map(
+      (f) => optionalPath(f, role, "a guard.writeOnlyUnder folder") ?? "",
+    ),
+    reason,
+  };
+}
+
 function parseEntry(v: unknown, seen: Set<string>): RoleEntry {
   if (!isRecord(v)) throw new RolesConfigError("each entry in roles must be an object");
   const role = v.role;
@@ -187,6 +239,7 @@ function parseEntry(v: unknown, seen: Set<string>): RoleEntry {
     plugins: nameList(v.plugins, role, "plugins"),
     telegramChats: nameList(v.telegramChats, role, "telegramChats"),
     questionPrefix: optionalMatch(v.questionPrefix, PREFIX_RE, role, "questionPrefix"),
+    guard: parseGuard(v.guard, role),
   };
 }
 

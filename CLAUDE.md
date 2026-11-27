@@ -111,6 +111,10 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   `session_id` are used; the rest (a UserPromptSubmit prompt included) is parsed and dropped, never stored or logged.
   `hub mail statusline` reads Claude Code's status-line input on stdin: only `session_id` is used; the rest is parsed
   and dropped, never stored or logged.
+  `hub guard` reads Claude Code's PreToolUse input on stdin: only `session_id`, `tool_name` and, from `tool_input`,
+  `subagent_type`, `file_path` and `notebook_path`; the rest (file contents, prompts, commands) is parsed and dropped,
+  never stored or logged. Its only state is the owner's pauses in `guard-off.json` in the data folder. It is a guard
+  rail for a role's own mistakes, not a sandbox: it fails open, and shell tools are not matched.
   `hub mail wait` reads the same hook input as `hub mail hook` (only `hook_event_name` and `session_id`) and keeps
   `run\waiters\waiters.db` (its own SQLite file, never hub.db: per session a waiter lease, the rung mail ids and
   delivery counts; sessions unseen for 14 days are dropped); its stderr doorbell names only mail ids, kinds and

@@ -53,6 +53,7 @@ const NO_CATALOGUE = {
   plugins: [],
   telegramChats: [],
   questionPrefix: null,
+  guard: null,
   problems: [],
 };
 

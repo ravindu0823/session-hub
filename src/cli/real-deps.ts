@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import pkg from "../../package.json" with { type: "json" };
@@ -328,6 +328,14 @@ export function realCliDeps(opts: {
         readInput: async (p) => (p === "-" ? await Bun.stdin.text() : readFileSync(p, "utf8")),
         sleep: (ms) => Bun.sleep(ms),
         exists: (p) => existsSync(p),
+        readGuardOff: () => {
+          try {
+            return readFileSync(join(paths.dataDir, "guard-off.json"), "utf8");
+          } catch {
+            return null;
+          }
+        },
+        writeGuardOff: (text) => writeFileSync(join(paths.dataDir, "guard-off.json"), text),
         openWaiter: () =>
           sqliteWaiterState(join(paths.runDir, "waiters", "waiters.db"), process.pid),
         // An install stages hub.exe.new before its swap (a recent one: a copy left by a killed
