@@ -114,7 +114,7 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   `hub guard` reads Claude Code's PreToolUse input on stdin: only `session_id`, `tool_name` and, from `tool_input`,
   `subagent_type`, `file_path` and `notebook_path`; the rest (file contents, prompts, commands) is parsed and dropped,
   never stored or logged. Its only state is the owner's pauses in `guard-off.json` in the data folder. It is a guard
-  rail for a role's own mistakes, not a sandbox: it fails open, and Bash is not matched.
+  rail for a role's own mistakes, not a sandbox: it fails open, and shell tools are not matched.
 
 ## Target architecture
 - Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index and owns its schema; the TUI and the

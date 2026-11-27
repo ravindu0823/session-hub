@@ -53,7 +53,8 @@ function readCall(text: string): (GuardCall & { sid: string }) | null {
     sid,
     tool,
     subagentType: str(ti.subagent_type),
-    path: str(ti.file_path) ?? str(ti.notebook_path),
+    // Each tool's own path field only: a stray second field never decides where a write goes.
+    path: tool === "NotebookEdit" ? str(ti.notebook_path) : str(ti.file_path),
   };
 }
 
@@ -61,9 +62,16 @@ function readCall(text: string): (GuardCall & { sid: string }) | null {
 function readOff(d: GuardDeps): Map<string, number> {
   const out = new Map<string, number>();
   try {
-    const o = JSON.parse(d.readGuardOff?.() ?? "{}") as Record<string, unknown>;
+    const o: unknown = JSON.parse(d.readGuardOff?.() ?? "{}");
+    if (typeof o !== "object" || o === null || Array.isArray(o)) return out;
     for (const [role, until] of Object.entries(o)) {
-      if (isRoleName(role) && typeof until === "number" && Number.isFinite(until)) {
+      // A pause never lasts longer than `hub guard off` can set: anything later is not one.
+      if (
+        isRoleName(role) &&
+        typeof until === "number" &&
+        Number.isFinite(until) &&
+        until <= d.now() + MAX_OFF_MINUTES * 60_000
+      ) {
         out.set(role, until);
       }
     }
@@ -99,7 +107,7 @@ async function runHook(d: GuardDeps): Promise<number> {
     if (reason === null) return 0;
     d.err(
       `hub guard: blocked for role ${r.role}: ${reason}. ` +
-        `Owner override, outside Claude Code: hub guard off --role ${r.role} --minutes 30`,
+        "If the owner wants it done here anyway, ask the owner; do not work around this block.",
     );
     return 2;
   } catch (e) {
@@ -114,7 +122,10 @@ function timeOf(ms: number): string {
   return new Date(ms).toISOString().slice(0, 16).replace("T", " ");
 }
 
-/** `hub guard [status | off | on]`. Exit codes: 0 ok (or the hook passed), 1 refused, 2 usage/blocked. */
+/**
+ * `hub guard [status | off | on]`. Exit codes: 0 ok (or the hook passed), 1 refused or a usage
+ * error, 2 blocked. A usage error is never 2: a mistyped hook command must not block every call.
+ */
 export async function runGuardCli(args: readonly string[], d: GuardDeps): Promise<number> {
   if (args.length === 0) return runHook(d);
   const [sub, ...rest] = args;
@@ -144,7 +155,7 @@ export async function runGuardCli(args: readonly string[], d: GuardDeps): Promis
   const isOn = sub === "on" && rest.length === 2;
   if ((!isOff && !isOn) || role === undefined || !isRoleName(role)) {
     d.err(GUARD_USAGE);
-    return 2;
+    return 1;
   }
   // Prevents mistakes only (a session pausing its own guard by accident): any process can unset
   // these variables, so the guard is a guard rail, not a sandbox.
@@ -153,12 +164,19 @@ export async function runGuardCli(args: readonly string[], d: GuardDeps): Promis
     return 1;
   }
   if (d.writeGuardOff === undefined) return 1;
+  if (
+    isOff &&
+    !parseRolesConfig(d.readRoles()).roles.some((e) => e.role === role && e.guard !== null)
+  ) {
+    d.err(`hub guard: refused: role ${role} has no guard policy in roles.json`);
+    return 1;
+  }
   const off = readOff(d);
   if (isOff) {
     const minutes = Number(rest[3]);
     if (!/^\d{1,3}$/.test(rest[3] ?? "") || minutes < 1 || minutes > MAX_OFF_MINUTES) {
       d.err(GUARD_USAGE);
-      return 2;
+      return 1;
     }
     off.set(role, d.now() + minutes * 60_000);
   } else {

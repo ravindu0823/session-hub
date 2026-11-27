@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { blockReason, insideAny, matchesName, type RoleGuard } from "../../src/guard/policy";
 
 const guard: RoleGuard = {
-  denyTools: ["mcp__ops*", "mcp__kv__exec", "WebFetch"],
+  denyTools: ["mcp__ops*", "mcp__vault__exec", "WebFetch"],
   denyAgents: ["ops-*", "general-purpose", "Explore"],
   writeOnlyUnder: ["C:\\work\\notes", "C:/Users/me/memory/"],
   reason: "coordinator only: delegate",
@@ -44,8 +44,8 @@ describe("blockReason", () => {
     expect(blockReason(guard, call("mcp__ops-live__deploy"))).toBe(
       "coordinator only: delegate (tool mcp__ops-live__deploy)",
     );
-    expect(blockReason(guard, call("mcp__kv__exec"))).not.toBeNull();
-    expect(blockReason(guard, call("mcp__kv__list_handles"))).toBeNull();
+    expect(blockReason(guard, call("mcp__vault__exec"))).not.toBeNull();
+    expect(blockReason(guard, call("mcp__vault__list_handles"))).toBeNull();
     expect(blockReason(guard, call("Read"))).toBeNull();
     expect(blockReason(guard, call("Bash"))).toBeNull();
   });

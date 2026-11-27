@@ -32,7 +32,7 @@ function session(id: string, name: string): SessionRow {
 }
 
 const POLICY = {
-  denyTools: ["mcp__ops*", "mcp__kv__exec"],
+  denyTools: ["mcp__ops*", "mcp__vault__exec"],
   denyAgents: ["ops-*", "general-purpose", "Explore"],
   writeOnlyUnder: ["C:\\work\\notes"],
   reason: "coordinator only: delegate to the owning session",
@@ -106,7 +106,7 @@ describe("hub guard as a PreToolUse hook", () => {
     expect(r.err).toHaveLength(1);
     expect(r.err[0]).toContain("blocked for role lead");
     expect(r.err[0]).toContain("coordinator only: delegate to the owning session");
-    expect(r.err[0]).toContain("hub guard off --role lead --minutes 30");
+    expect(r.err[0]).toContain("ask the owner; do not work around this block");
     expect(r.err[0]).not.toContain("SECRET");
   });
 
@@ -126,7 +126,7 @@ describe("hub guard as a PreToolUse hook", () => {
     for (const [tool, ti] of [
       ["Read", { file_path: "C:\\repo\\a.ts" }],
       ["Bash", { command: "gh pr view 1" }],
-      ["mcp__kv__list_handles", {}],
+      ["mcp__vault__list_handles", {}],
       ["Agent", { subagent_type: "reviewer" }],
       ["Write", { file_path: "C:\\work\\notes\\register.md" }],
     ] as const) {
@@ -199,6 +199,56 @@ describe("hub guard as a PreToolUse hook", () => {
   });
 });
 
+describe("hub guard: review fixes", () => {
+  test("each tool's own path field decides; a stray second field does not", async () => {
+    hook("s-lead", "NotebookEdit", {
+      notebook_path: "C:\\repo\\x.ipynb",
+      file_path: "C:\\work\\notes\\a.md",
+    });
+    expect((await guard()).code).toBe(2);
+    hook("s-lead", "Edit", {
+      file_path: "C:\\repo\\a.ts",
+      notebook_path: "C:\\work\\notes\\a.ipynb",
+    });
+    expect((await guard()).code).toBe(2);
+    hook("s-lead", "Edit", {
+      file_path: `C:\\repo\\${"a".repeat(3000)}`,
+      notebook_path: "C:\\work\\notes\\a",
+    });
+    expect((await guard()).code).toBe(2);
+  });
+
+  test("a hostile pause file never pauses for good and never breaks status", async () => {
+    hook("s-lead", "mcp__ops-live__deploy");
+    for (const text of ["[1e15]", "null", '{"lead":1e20}', '{"lead":"x"}', "{"]) {
+      offFile = text;
+      expect((await guard()).code).toBe(2);
+      const s = await guard(["status"]);
+      expect(s.code).toBe(0);
+      expect(s.out[0]).toStartWith("lead: ON");
+    }
+  });
+
+  test("a pause for a role without a policy is refused", async () => {
+    const r = await guard(["off", "--role", "dev", "--minutes", "5"]);
+    expect(r.code).toBe(1);
+    expect(r.err[0]).toContain("has no guard policy");
+    expect(offFile).toBeNull();
+  });
+
+  test("a second session of a role is guarded only when the role's sessions pattern names it", async () => {
+    const s = Store.open(dbPath);
+    opened.push(s);
+    s.upsertSession(session("s-lead2", "lead-2"));
+    hook("s-lead2", "mcp__ops-live__deploy");
+    expect((await guard()).code).toBe(0); // role "lead-2": no policy
+    roles = JSON.stringify({
+      roles: [{ role: "lead", sessions: ["lead", "lead-*"], guard: POLICY }],
+    });
+    expect((await guard()).code).toBe(2);
+  });
+});
+
 describe("hub guard status, off and on", () => {
   test("status lists policies and pauses", async () => {
     let r = await guard(["status"]);
@@ -220,9 +270,9 @@ describe("hub guard status, off and on", () => {
   });
 
   test("ended pauses are dropped when the file is written", async () => {
-    offFile = JSON.stringify({ old: clock - 1, lead: clock + 5 });
-    await guard(["off", "--role", "dev", "--minutes", "1"]);
-    expect(Object.keys(JSON.parse(offFile ?? "{}")).sort()).toEqual(["dev", "lead"]);
+    offFile = JSON.stringify({ old: clock - 1, other: clock + 5 });
+    await guard(["off", "--role", "lead", "--minutes", "1"]);
+    expect(Object.keys(JSON.parse(offFile ?? "{}")).sort()).toEqual(["lead", "other"]);
   });
 
   test("refused inside a Claude Code session", async () => {
@@ -244,7 +294,7 @@ describe("hub guard status, off and on", () => {
       ["x"],
       ["status", "x"],
     ]) {
-      expect((await guard(args)).code).toBe(2);
+      expect((await guard(args)).code).toBe(1); // never 2: that would block every hooked call
     }
     expect((await guard(["--help"])).out[0]).toContain("Per-role tool policy");
   });

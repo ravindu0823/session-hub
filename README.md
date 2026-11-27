@@ -340,6 +340,7 @@ doing work that belongs to other sessions:
 ```json
 {
   "role": "lead",
+  "sessions": ["lead", "lead-*"],
   "guard": {
     "denyTools": ["mcp__deploy*", "WebFetch"],
     "denyAgents": ["general-purpose", "Explore", "Plan", "ops-*"],
@@ -350,11 +351,17 @@ doing work that belongs to other sessions:
 ```
 
 Names are exact or end in `*` (a prefix). `denyAgents` applies to the Agent tool's agent type (no type counts as
-`general-purpose`); `writeOnlyUnder` limits Edit, Write, MultiEdit and NotebookEdit. `hub guard` is the PreToolUse
+`general-purpose`); a skill that runs in its own subagent goes through the `Skill` tool instead, so name `Skill` in
+`denyTools` (and in the matcher) when that matters. `writeOnlyUnder` limits Edit, Write, MultiEdit and NotebookEdit
+(each by its own path field); paths are compared as text, so a junction inside an allowed folder leads out of it.
+Without `sessions`, a second session named `lead-2` is its own role and is not guarded. `hub guard` is the PreToolUse
 hook that applies it: a denied call is blocked (exit 2) with the reason, which the session sees. Sessions of roles
 without a policy are never affected, and when no role has a policy the hook does not even open the index. Any problem
 (no index, an unknown session, bad input) lets the call through: the guard is a guard rail, not a sandbox, and it does
-not look at Bash. Add it to each profile's `settings.json`, matched on the tools your policies name:
+not look at shell tools (Bash, PowerShell). A usage error exits 1, never 2, so a mistyped command never blocks a call.
+Install a build that has `hub guard` before you add the hook, and remove the hook before you roll back to an older
+build (an older `hub.exe` answers `hub guard` with a usage error, exit 2, which blocks every matched call). Add it to
+each profile's `settings.json`, matched on the tools your policies name:
 
 ```json
 {
