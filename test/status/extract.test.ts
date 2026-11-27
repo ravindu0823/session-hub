@@ -758,3 +758,64 @@ describe("the standard template: fifth review fixes", () => {
     expect(ids(`### Waiting on you\n- SH1 a\n\n${mark}\nSH2 b\n`)).toEqual(["SH1"]);
   });
 });
+
+describe("the standard template: sixth review fixes", () => {
+  const ids = (md: string) => extractStatus(md)?.waiting.map((w) => w.id);
+
+  test("an ID-led line with a mark is an item, never a group that hides the next items", () => {
+    expect(ids("### Waiting on you\n- SH1 a\n**✅ SH2** answered\n- SH3 open\n")).toEqual([
+      "SH1",
+      "SH3",
+    ]);
+    expect(ids("### Waiting on you\n- SH1 a\n✅ **SH2 · answered**\n- SH3 open\n")).toEqual([
+      "SH1",
+      "SH3",
+    ]);
+    expect(ids("### Waiting on you\n- SH1 a\n✅ **SH2 answered yes**\n- SH3 open\n")).toEqual([
+      "SH1",
+      "SH3",
+    ]);
+    expect(
+      ids(`### Waiting on you\n- SH1 a\n✅ **SH2 answered ${"y".repeat(80)}**\n- SH3 open\n`),
+    ).toEqual(["SH1", "SH3"]);
+    expect(
+      ids("**Waiting on you**\n🔴 **SH2 · Approve the deploy**\n🟡 **SH3 · Review**\n"),
+    ).toEqual([null]);
+    expect(ids("### Waiting on you\n🔴 **P0 blockers**\n- SH1 a\n")).toEqual(["SH1"]);
+    expect(
+      ids("### Waiting on you\n✅ **Settled since last reply:** SH0 → yes\n- SH1 x\n"),
+    ).toEqual([]);
+  });
+
+  test("a table keeps at most 200 rows; the rest are neither items nor recommendations", () => {
+    const rows = Array.from({ length: 201 }, (_, i) => `| SH${i + 1} | recommend x |`).join("\n");
+    const s = extractStatus(`### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n${rows}\n`);
+    expect(s?.waiting).toHaveLength(200);
+    expect(s?.waiting.at(-1)?.id).toBe("SH200");
+    expect(s?.recommendations.join(" ")).not.toContain("SH201");
+  });
+
+  test("the row count starts again at each new table, in both header paths", () => {
+    const many = (from: number) =>
+      Array.from({ length: 200 }, (_, i) => `| SH${from + i} | x |`).join("\n");
+    const a = extractStatus(
+      `### Waiting on you\n🟢 **Here**\n| ID | What |\n|---|---|\n${many(1)}\n| ID | Other |\n|---|---|\n| SH900 | b |\n`,
+    );
+    expect(a?.waiting.at(-1)?.id).toBe("SH900");
+    const b = extractStatus(
+      `### Waiting on you\n🟢 **Here**\n${many(1)}\n| ID | What |\n|---|---|\n| SH900 | b |\n`,
+    );
+    expect(b?.waiting.at(-1)?.id).toBe("SH900");
+  });
+
+  test("Phase: followed only by a line terminator is not progress, as on main", () => {
+    expect(
+      extractStatus("**Progress: about 10% overall. Phase:\r")?.progressPct ?? null,
+    ).toBeNull();
+    expect(
+      extractStatus(`**Progress: about 10% overall. Phase:${String.fromCharCode(0x2028)}`)
+        ?.progressPct ?? null,
+    ).toBeNull();
+    expect(extractStatus("**Progress: about 10% overall. Phase: x\r")?.phase).toBe("x");
+  });
+});

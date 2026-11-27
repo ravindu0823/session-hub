@@ -18,6 +18,8 @@ export interface Status {
 // (".*$" fails on a "\r" or a line separator and retries every split of the run before it).
 const PROGRESS_RE =
   /^\s*\*{0,2}Progress:\s*(?:about\s+)?(\d{1,3}(?:\.\d+)?)%\s+overall\.\s+Phase:(\s*)([\s\S]*)/i;
+/** A character the old "." matched: anything but a line terminator. */
+const NOT_TERMINATOR = /[^\n\r\u2028\u2029]/;
 // The tail "\s*(?:#+\s*)?$" fails in linear time on a long whitespace run (no two adjacent \s*).
 const REMAINING_HASH = /^\s{0,3}#{2,4}\s*\**what['\u2019]s remaining:?\**:?\s*(?:#+\s*)?$/i;
 /** "## Waiting on you", optionally with a count: "## Waiting on you \u2014 5 items". */
@@ -62,21 +64,37 @@ const GROUP_EMOJI = "(\u{1F534}|\u{1F7E1}|\u{1F7E2}|⚪|✅)️?";
 const GROUP_BOLD = new RegExp(`^(?:\\*\\*${GROUP_EMOJI}|${GROUP_EMOJI} ?\\*\\*)`, "u");
 const SETTLED_MARK = "✅";
 
+/** A group mark at the start of a bold span ("**✅ SH2**"), with its variation selector. */
+const LEADING_MARK = new RegExp(`^${GROUP_EMOJI}\\s*`, "u");
+/** What may follow an ID that opens a bold span for the line to be an item: "SH2 · Approve". */
+const AFTER_ID = /^\s*(?:$|[·:,\u2013\u2014-])/;
+
 /**
- * The group mark when the line is a group header, else null. A mark line whose first bold span is
- * exactly an ID ("✅ **SH2** answered") is an item line, as it was before the template existed;
- * "🔴 **P0 blockers**" is a group.
+ * The group mark when the line is a group header, else null. A mark line whose first bold span
+ * (after any mark inside it) is an ID, or an ID followed by "·", ":", "," or a dash, is an item line
+ * as it was before the template existed ("✅ **SH2** answered", "**✅ SH2 · answered**",
+ * "🔴 **SH2 · Approve**"); "🔴 **P0 blockers**" is a group. A ✅ line whose bold text starts with
+ * any ID ("✅ **SH2 answered yes**") is an item too: read as the settled group, it would hide the
+ * open items after it.
  */
 function groupMark(line: string): string | null {
   const m = GROUP_BOLD.exec(line);
   if (!m) return null;
+  const mark = m[1] ?? m[2] ?? null;
   const open = line.indexOf("**");
   const close = line.indexOf("**", open + 2);
-  if (close !== -1 && close - open <= MAX_ID_CELL) {
-    const span = stripMarkdown(withoutNewMark(line.slice(open + 2, close))).trim();
-    if (span !== "" && idAt(span) === span) return null;
+  const end = open + 2 + MAX_ID_CELL;
+  const settled = mark === SETTLED_MARK;
+  if ((close !== -1 && close <= end) || settled) {
+    const span = stripMarkdown(
+      withoutNewMark(line.slice(open + 2, close === -1 ? end : Math.min(close, end))),
+    )
+      .trim()
+      .replace(LEADING_MARK, "");
+    const id = idAt(span);
+    if (id !== null && (settled || AFTER_ID.test(span.slice(id.length)))) return null;
   }
-  return m[1] ?? m[2] ?? null;
+  return mark;
 }
 /** "— 5 items (…)" alone after the Waiting on you heading: a count, not an item. */
 const COUNT_RE = /^[–—-]\s*\d+\s+items?\b(?:\s*\([^)\n]*\))?\s*$/i;
@@ -418,12 +436,13 @@ export function extractStatus(markdown: string): Status | null {
     const m = PROGRESS_RE.exec(line);
     // The phase ends at the first "**" after its first character (as the old lazy "(.+?)" did) or
     // at the end of the line, without a final ".": found by string search, not by a regex tail.
-    // As on main, at least one character (a space counts) must follow "Phase:".
+    // As on main, at least one character (a space counts, a line terminator does not) must follow
+    // "Phase:".
     const rest = m?.[3] ?? "";
     const bold = rest.indexOf("**", 1);
     let raw = bold === -1 ? rest.trimEnd() : rest.slice(0, bold);
     if (raw.length > 1 && raw.endsWith(".")) raw = raw.slice(0, -1);
-    if (m?.[1] && (m[2] ?? "") + rest !== "") {
+    if (m?.[1] && NOT_TERMINATOR.test((m[2] ?? "") + rest)) {
       progressPct = Math.min(100, Math.max(0, Math.round(Number(m[1]))));
       phase = stripMarkdown(raw);
       break;
@@ -512,6 +531,7 @@ export function extractStatus(markdown: string): Status | null {
         if (head !== null) return;
         if (pending !== null) consumed.add(pending.at);
         head = tableHead(pending?.cells ?? []);
+        tableRows = 0;
         pending = null;
       } else if (head !== null) {
         // A row with no ID cell, followed by a separator, is the header of a new table right
