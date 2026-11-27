@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +7,9 @@ import { type MailCliDeps, runMailCli } from "../../src/mail/cli";
 import { sqliteWaiterState } from "../../src/mail/waiter";
 import { type SessionRow, Store } from "../../src/store/db";
 import { MIGRATIONS } from "../../src/store/schema";
+
+// The wait tests open two SQLite files per poll, which is slow on the Windows CI disk.
+setDefaultTimeout(30_000);
 
 let dir: string;
 let dbPath: string;
