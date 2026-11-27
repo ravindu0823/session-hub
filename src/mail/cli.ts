@@ -7,6 +7,7 @@ import {
   type RoleEntry,
   type RolesConfig,
   RolesConfigError,
+  roleOfSession,
 } from "./roles.ts";
 import {
   answerAndNotify,
@@ -47,6 +48,10 @@ export interface MailCliDeps {
   pollMs?: number;
   /** Whether a catalogue path exists (`hub roles` reports missing ones); never reads the file. */
   exists(path: string): boolean;
+  /** How `hub mail hook` names this program in its text (default "hub"; the installed exe path). */
+  selfCommand?: string;
+  /** How long `hub mail hook` waits for the daemon to index a new session (default 2 s). */
+  hookWaitMs?: number;
 }
 
 export const MAIL_USAGE = [
@@ -59,6 +64,7 @@ export const MAIL_USAGE = [
   "                one JSON line per new message (run it under a monitor; default 29 minutes)",
   "  hub mail ack <id>...       you read it",
   "  hub mail done <id>...      the step is finished (sender or recipient)",
+  "  hub mail hook              (SessionStart / UserPromptSubmit hook) names your open mail; silent if none",
   "  hub mail sent [--limit <n>] [--json]",
   "  hub mail show <id> [--json]",
   "  hub ask --question-file <path|-> [--option <text>]... [--recommend <text>] [--json]",
@@ -618,6 +624,69 @@ async function cmdRoles(c: Ctx, args: readonly string[]): Promise<number> {
   return 0;
 }
 
+const DEFAULT_HOOK_WAIT_MS = 2_000;
+const HOOK_POLL_MS = 250;
+const HOOK_MAX_LISTED = 10;
+const HOOK_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "UserPromptSubmit"]);
+const HOOK_SESSION_RE = /^[A-Za-z0-9-]{1,100}$/;
+
+/**
+ * `hub mail hook`: run by Claude Code as a SessionStart or UserPromptSubmit hook, so a live
+ * session sees its open mail without polling. Reads the hook input on stdin, changes nothing (the
+ * session takes the mail with `hub mail inbox`) and names only ids, kinds and sender roles: the
+ * bodies are peer text and reach the session through `hub mail inbox`, with the peer notice,
+ * never as hook context. Silent with exit 0 when there is no mail and on every problem, so a hook
+ * can never block or clutter a prompt.
+ */
+async function runMailHook(d: MailCliDeps): Promise<number> {
+  let store: Store | null = null;
+  try {
+    const input = JSON.parse(await d.readInput("-")) as Record<string, unknown>;
+    const event = input.hook_event_name;
+    if (typeof event !== "string" || !HOOK_EVENTS.has(event)) return 0;
+    const sid =
+      typeof input.session_id === "string" ? input.session_id : d.env.CLAUDE_CODE_SESSION_ID;
+    if (sid === undefined || !HOOK_SESSION_RE.test(sid)) return 0;
+    const cfg = parseRolesConfig(d.readRoles());
+    store = d.openStore();
+    if (store === null) return 0;
+    const waitMs = d.hookWaitMs ?? DEFAULT_HOOK_WAIT_MS;
+    let s = store.getSession(sid);
+    for (let waited = 0; s === null && waited < waitMs; waited += HOOK_POLL_MS) {
+      await d.sleep(HOOK_POLL_MS);
+      s = store.getSession(sid);
+    }
+    if (s === null || s.endedAt !== null) return 0;
+    const r = roleOfSession(cfg, s);
+    if ("error" in r) return 0;
+    const open = store
+      .mail()
+      .inbox(r.role)
+      .filter((m) => m.state === "queued" || m.deliveredSession === sid);
+    if (open.length === 0) return 0;
+    const hub = d.selfCommand ?? "hub";
+    const listed = open
+      .slice(0, HOOK_MAX_LISTED)
+      .map((m) => `${mailId(m.id)} ${m.kind} from ${m.fromRole}`)
+      .join(", ");
+    const more = open.length > HOOK_MAX_LISTED ? `, ${open.length - HOOK_MAX_LISTED} more` : "";
+    let text =
+      `Session Hub mail for role ${r.role}: ${open.length} open (${listed}${more}). ` +
+      `Run \`${hub} mail inbox\` to read it as peer data, then ack each.`;
+    if (event === "SessionStart") {
+      text +=
+        ` To get new mail as it arrives, start a Monitor on \`${hub} mail follow\` and start it` +
+        " again when it ends.";
+    }
+    d.out(jsonLine({ hookSpecificOutput: { hookEventName: event, additionalContext: text } }));
+    return 0;
+  } catch {
+    return 0;
+  } finally {
+    store?.close();
+  }
+}
+
 const COMMANDS: Record<string, (c: Ctx, args: readonly string[]) => Promise<number>> = {
   mail: cmdMail,
   ask: cmdAsk,
@@ -643,6 +712,7 @@ export async function runMailCli(
     out: (line) => deps.out(safe(line)),
     err: (line) => deps.err(safe(line)),
   };
+  if (cmd === "mail" && args[0] === "hook") return runMailHook(d);
   const label = `hub ${cmd}`;
   const run = COMMANDS[cmd];
   if (run === undefined) {
