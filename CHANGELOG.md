@@ -23,6 +23,9 @@ messages to a session with SHA-256 delivery checks. First public release on 2026
   after an ID is a separator like `-`. Status lines ending in `\r` or a line separator no longer slow the parser. (#41)
 - `hub mail statusline`: a status line command that prints `✉ N` for the session's open mail (read-only, never
   waits, silent with no mail and on every problem). (#43)
+- `hub mail wait`: an `asyncRewake` hook command for `SessionStart` and `Stop` that wakes an idle session once per
+  new mail with a doorbell line (ids, kinds and sender roles, never the text); one waiter per session, never the
+  same mail twice. `hub mail hook` moves its bookmark past the mail it names. (#44)
 - Role catalogue in `roles.json`: optional `folder`, `brief`, `model`, `effort`, `gateway`, `mcpServers`, `plugins`,
   `telegramChats` and a unique `questionPrefix` per role, plus `reservedPrefixes`, checked by the parser and returned
   by `hub roles --json` with per-role problems (missing paths, a chat two roles list). (#34)

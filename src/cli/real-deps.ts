@@ -5,13 +5,14 @@ import { basename, dirname, join } from "node:path";
 import pkg from "../../package.json" with { type: "json" };
 import { readLines } from "../bridge/protocol.ts";
 import { type BridgeDeps, runBridge } from "../bridge/server.ts";
-import { DATA_DIR, PROFILES, RELAY_LOG } from "../config.ts";
+import { DAEMON_STOPPED_FILE, DATA_DIR, PROFILES, RELAY_LOG } from "../config.ts";
 import { identifyDaemon, type LockInfo } from "../daemon/lock.ts";
 import { createLogger } from "../daemon/log.ts";
 import { realClaudeCli } from "../discovery/agents.ts";
 import { runMailCli } from "../mail/cli.ts";
 import { parseRolesConfig, type RolesConfig, rolesLoader } from "../mail/roles.ts";
 import { insideClaudeCode, mailUpkeep, withoutSessionEnv } from "../mail/service.ts";
+import { recentFile, sqliteWaiterState } from "../mail/waiter.ts";
 import { createWindowsPlatform } from "../platform/windows/index.ts";
 import { sysbin } from "../platform/windows/sysbin.ts";
 import { claimMarkerFile, runGuard } from "../send/guard.ts";
@@ -335,6 +336,16 @@ export function realCliDeps(opts: {
           }
         },
         writeGuardOff: (text) => writeFileSync(join(paths.dataDir, "guard-off.json"), text),
+        openWaiter: () =>
+          sqliteWaiterState(join(paths.runDir, "waiters", "waiters.db"), process.pid),
+        // An install stages hub.exe.new before its swap (a recent one: a copy left by a killed
+        // install must not keep every waiter off), a deliberate daemon stop (install,
+        // uninstall) writes daemon.stopped first, and a purge deletes hub.db: a waiter then exits
+        // and lets go of hub.exe.
+        shouldStop: () =>
+          existsSync(join(paths.runDir, DAEMON_STOPPED_FILE)) ||
+          recentFile(`${paths.installedExe}.new`, 120_000) ||
+          !existsSync(paths.dbPath),
         // `hub` is not on PATH in every shell a session uses: the hook text names this exe.
         ...(compiled ? { selfCommand: process.execPath } : {}),
       }),

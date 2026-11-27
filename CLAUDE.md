@@ -115,6 +115,12 @@ scripts/                   build, install/uninstall helpers, Windows report, GUI
   `subagent_type`, `file_path` and `notebook_path`; the rest (file contents, prompts, commands) is parsed and dropped,
   never stored or logged. Its only state is the owner's pauses in `guard-off.json` in the data folder. It is a guard
   rail for a role's own mistakes, not a sandbox: it fails open, and shell tools are not matched.
+  `hub mail wait` reads the same hook input as `hub mail hook` (only `hook_event_name` and `session_id`) and keeps
+  `run\waiters\waiters.db` (its own SQLite file, never hub.db: per session a waiter lease, the rung mail ids and
+  delivery counts; sessions unseen for 14 days are dropped); its stderr doorbell names only mail ids, kinds and
+  sender roles. A waiter is a `bin\hub.exe` process that can live up to 24 h per session; it exits within a second
+  when `run\daemon.stopped` or `bin\hub.exe.new` exists or hub.db is gone, so install and uninstall can replace or
+  remove the exe.
 
 ## Target architecture
 - Local single-user desktop tool: one daemon (`hubd`) writes the SQLite index and owns its schema; the TUI and the
